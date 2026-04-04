@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "google-calendar": {
+      "command": "npx",
+      "args": ["-y", "@cocal/google-calendar-mcp"],
+      "env": {
+        "GOOGLE_OAUTH_CREDENTIALS": "/Users/andrey_akatov/Github/FMT-exocortex-template/.secrets/gcp-oauth.keys.json"
+      }
+    }
+  }
+}
