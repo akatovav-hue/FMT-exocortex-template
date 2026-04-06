@@ -4,12 +4,12 @@
 
 ## Контекст
 
-- **Заметки:** /Users/andrey_akatov/github/DS-strategy/inbox/[fleeting-notes.md](https://github.com/{{GITHUB_USER}}/DS-strategy/blob/main/inbox/fleeting-notes.md)
+- **Заметки:** /Users/andrey_akatov/github/DS-strategy/inbox/[fleeting-notes.md](https://github.com/your-username/DS-strategy/blob/main/inbox/fleeting-notes.md)
 - **НЭП:** /Users/andrey_akatov/github/DS-strategy/docs/Dissatisfactions.md
 - **Стратегия:** /Users/andrey_akatov/github/DS-strategy/docs/Strategy.md
 - **План недели:** /Users/andrey_akatov/github/DS-strategy/current/WeekPlan W*.md
 - **Inbox Экстрактора:** /Users/andrey_akatov/github/DS-strategy/inbox/captures.md
-- **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
+- **MEMORY:** ~/.claude/projects/-Users-andrey_akatov-github/memory/MEMORY.md
 
 ## Предусловие
 

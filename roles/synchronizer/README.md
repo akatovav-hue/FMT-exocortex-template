@@ -23,7 +23,7 @@
 ## Установка
 
 ```bash
-cd {{WORKSPACE_DIR}}/FMT-exocortex-template/roles/synchronizer
+cd /Users/andrey_akatov/github/FMT-exocortex-template/roles/synchronizer
 bash install.sh
 ```
 

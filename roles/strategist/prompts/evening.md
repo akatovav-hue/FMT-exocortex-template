@@ -2,7 +2,7 @@
 
 ## Контекст
 
-- Планы: {{WORKSPACE_DIR}}/DS-strategy/current/
+- Планы: /Users/andrey_akatov/github/DS-strategy/current/
 
 ## Алгоритм
 
