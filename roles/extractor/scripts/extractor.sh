@@ -13,7 +13,7 @@ set -e
 # Конфигурация
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-WORKSPACE="/Users/andrey_akatov/github"
+WORKSPACE="/Users/andrey_akatov/IWE"
 PROMPTS_DIR="$REPO_DIR/prompts"
 LOG_DIR="/Users/andrey_akatov/logs/extractor"
 CLAUDE_PATH="claude"

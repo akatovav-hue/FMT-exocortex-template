@@ -1,6 +1,6 @@
 # Оперативная память
 
-> **Инструкции:** `/Users/andrey_akatov/github/CLAUDE.md` | **Настройте под свою экосистему**
+> **Инструкции:** `/Users/andrey_akatov/IWE/CLAUDE.md` | **Настройте под свою экосистему**
 
 ## БЛОКИРУЮЩИЕ (проверяй ВСЕГДА)
 
@@ -11,7 +11,7 @@
 ## ВАЖНЫЕ (проверяй на рубежах)
 
 3. **Capture:** На рубеже → «Capture: X → Y» (CLAUDE.md § 2)
-4. **Отчёты:** ВСЕ репо в /Users/andrey_akatov/github/
+4. **Отчёты:** ВСЕ репо в /Users/andrey_akatov/IWE/
 5. **Процессы:** Нельзя реализовывать без PROCESSES.md (CLAUDE.md § 3)
 
 ---

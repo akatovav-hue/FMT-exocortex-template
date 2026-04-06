@@ -21,8 +21,8 @@ version: 1.0.0
 ### 2. Показать текущее состояние кастомизаций
 
 ```bash
-ls /Users/andrey_akatov/github/extensions/*.md 2>/dev/null || echo "(нет расширений)"
-cat /Users/andrey_akatov/github/params.yaml 2>/dev/null
+ls /Users/andrey_akatov/IWE/extensions/*.md 2>/dev/null || echo "(нет расширений)"
+cat /Users/andrey_akatov/IWE/params.yaml 2>/dev/null
 ```
 
 Сообщить:

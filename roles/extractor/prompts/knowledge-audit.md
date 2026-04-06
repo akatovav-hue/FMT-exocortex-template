@@ -15,7 +15,7 @@
 ## Конфигурация
 
 > Перед обработкой прочитай:
-> 1. `/Users/andrey_akatov/github/FMT-exocortex-template/roles/extractor/config/routing.md` — таблицы маршрутизации
+> 1. `/Users/andrey_akatov/IWE/FMT-exocortex-template/roles/extractor/config/routing.md` — таблицы маршрутизации
 
 ## Алгоритм
 

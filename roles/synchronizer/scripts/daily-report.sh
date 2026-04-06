@@ -15,10 +15,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_DIR="$HOME/.local/state/exocortex"
 LOG_DIR="/Users/andrey_akatov/logs/synchronizer"
-STRATEGY_DIR="/Users/andrey_akatov/github/DS-strategy"
+STRATEGY_DIR="/Users/andrey_akatov/IWE/DS-strategy"
 
 # Agent Workspace: если существует — отчёты идут туда
-AGENT_WORKSPACE="/Users/andrey_akatov/github/DS-agent-workspace"
+AGENT_WORKSPACE="/Users/andrey_akatov/IWE/DS-agent-workspace"
 if [ -d "$AGENT_WORKSPACE/.git" ]; then
     REPORT_DIR="$AGENT_WORKSPACE/scheduler/reports"
     ARCHIVE_DIR="$AGENT_WORKSPACE/scheduler/reports/archive"
@@ -225,7 +225,7 @@ $warnings
 **Что делать:**
 "
         if echo "$warnings" | grep -q "push failed" 2>/dev/null; then
-            report+="- **push failed:** Mac был оффлайн. Запусти \`cd /Users/andrey_akatov/github/DS-strategy && git pull --rebase && git push\`
+            report+="- **push failed:** Mac был оффлайн. Запусти \`cd /Users/andrey_akatov/IWE/DS-strategy && git pull --rebase && git push\`
 "
         fi
     else

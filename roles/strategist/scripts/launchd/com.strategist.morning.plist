@@ -7,7 +7,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/andrey_akatov/github/FMT-exocortex-template/roles/strategist/scripts/strategist.sh</string>
+        <string>/Users/andrey_akatov/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh</string>
         <string>morning</string>
     </array>
 

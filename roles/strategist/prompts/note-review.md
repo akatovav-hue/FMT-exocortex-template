@@ -1,15 +1,15 @@
 Выполни сценарий «Ежедневный разбор заметок» для роли Стратег (R1).
 
-Источник сценария: /Users/andrey_akatov/github/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/note-review.md
+Источник сценария: /Users/andrey_akatov/IWE/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/note-review.md
 
 ## Контекст
 
-- **Заметки:** /Users/andrey_akatov/github/DS-strategy/inbox/[fleeting-notes.md](https://github.com/your-username/DS-strategy/blob/main/inbox/fleeting-notes.md)
-- **НЭП:** /Users/andrey_akatov/github/DS-strategy/docs/Dissatisfactions.md
-- **Стратегия:** /Users/andrey_akatov/github/DS-strategy/docs/Strategy.md
-- **План недели:** /Users/andrey_akatov/github/DS-strategy/current/WeekPlan W*.md
-- **Inbox Экстрактора:** /Users/andrey_akatov/github/DS-strategy/inbox/captures.md
-- **MEMORY:** ~/.claude/projects/-Users-andrey_akatov-github/memory/MEMORY.md
+- **Заметки:** /Users/andrey_akatov/IWE/DS-strategy/inbox/[fleeting-notes.md](https://github.com/your-username/DS-strategy/blob/main/inbox/fleeting-notes.md)
+- **НЭП:** /Users/andrey_akatov/IWE/DS-strategy/docs/Dissatisfactions.md
+- **Стратегия:** /Users/andrey_akatov/IWE/DS-strategy/docs/Strategy.md
+- **План недели:** /Users/andrey_akatov/IWE/DS-strategy/current/WeekPlan W*.md
+- **Inbox Экстрактора:** /Users/andrey_akatov/IWE/DS-strategy/inbox/captures.md
+- **MEMORY:** ~/.claude/projects/-Users-andrey_akatov-IWE/memory/MEMORY.md
 
 ## Предусловие
 
@@ -74,7 +74,7 @@
 - **Личные данные → personal/:** контакт → `personal/contacts.md`, аккаунт/URL → `personal/accounts.md`, токен/пароль → `personal/secrets.md`, прочее → `personal/reference.md`
 
 **Проверка актуальности (обязательно перед классификацией):**
-- Сверь заметку с коммитами за сегодня (`git log --since="00:00" --all --oneline` по всем /Users/andrey_akatov/github/ репо) и текущим WeekPlan
+- Сверь заметку с коммитами за сегодня (`git log --since="00:00" --all --oneline` по всем /Users/andrey_akatov/IWE/ репо) и текущим WeekPlan
 - Если задача из заметки **уже сделана** (есть коммит или РП done) → Шум (зачеркнуть), не тянуть в план
 - Если проблема из заметки **уже решена** → Шум
 - Если заметка ссылается на ситуацию, которая **изменилась** за день → оценить с учётом нового контекста
