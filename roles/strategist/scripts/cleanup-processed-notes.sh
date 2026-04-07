@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034  # Intermediate vars used in compound expressions
 # Детерминированная очистка обработанных заметок из fleeting-notes.md.
 #
 # Страховочная сеть для Note-Review Step 10: LLM часто копирует заметки в архив,

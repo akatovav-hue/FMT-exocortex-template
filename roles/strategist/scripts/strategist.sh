@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034,SC1090  # Vars used indirectly; source paths are dynamic
 # Strategist (Стратег) Agent Runner
 # Запускает Claude Code с заданным сценарием
 
@@ -158,7 +159,7 @@ acquire_lock() {
         fi
     fi
     echo $$ > "$lockdir/pid" || { rm -rf "$lockdir"; log "ERROR: failed to write PID for $scenario"; exit 1; }
-    trap "rm -rf \"$lockdir\" 2>/dev/null" EXIT
+    trap 'rm -rf "$lockdir" 2>/dev/null' EXIT
 }
 
 # Читаем strategy_day из конфига (L4 Personal)

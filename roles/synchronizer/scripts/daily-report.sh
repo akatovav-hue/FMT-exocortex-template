@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034  # Variables used indirectly or reserved for future use
 # daily-report.sh — ежедневный отчёт работы scheduler
 #
 # Формирует отчёт: что должно было сработать, что сработало, что нет.

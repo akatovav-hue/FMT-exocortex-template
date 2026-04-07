@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034  # Variables set for potential use in sourced contexts
 # Exocortex Update — загрузка обновлений платформы из FMT-exocortex-template
 #
 # Использование:
@@ -64,7 +65,7 @@ WORKSPACE_DIR="$(dirname "$SCRIPT_DIR")"
 
 # === Temp directory ===
 TMPDIR_UPDATE=$(mktemp -d 2>/dev/null || { mkdir -p "/tmp/exocortex-update-$$"; echo "/tmp/exocortex-update-$$"; })
-trap "rm -rf '$TMPDIR_UPDATE'" EXIT
+trap 'rm -rf "$TMPDIR_UPDATE"' EXIT
 
 echo "=========================================="
 echo "  Exocortex Update v$VERSION"

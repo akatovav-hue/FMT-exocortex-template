@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC1090  # source paths are dynamic
 # Fetch WakaTime stats for Strategist prompts
 # Usage: fetch-wakatime.sh <mode>
 #   mode: "today" — today's summary, all projects (for day-close)

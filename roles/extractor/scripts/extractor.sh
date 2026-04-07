@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC1090  # source paths are dynamic
 # Knowledge Extractor Agent Runner
 # Запускает Claude Code с заданным процессом KE
 #

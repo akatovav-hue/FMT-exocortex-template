@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034  # Variables used indirectly or reserved for future use
 # scheduler.sh — центральный диспетчер агентов экзокортекса
 #
 # Вызывается launchd (com.exocortex.scheduler) в нужные моменты.
