@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034  # Variables used indirectly by caller (notify.sh sources this file)
 # Шаблон уведомлений: Синхронизатор (R8)
 # Вызывается из notify.sh через source
 
