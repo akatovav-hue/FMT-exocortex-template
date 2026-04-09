@@ -68,6 +68,33 @@ build_message() {
             printf "<code>cd ~/IWE/FMT-exocortex-template && bash roles/synchronizer/scripts/scheduler.sh dispatch</code>"
             ;;
 
+        "audio-pending")
+            local inbox_dir="/Users/andrey_akatov/IWE/DS-strategy/inbox"
+            local pending=""
+            local count=0
+
+            for ext in m4a mp4 wav mp3 webm; do
+                while IFS= read -r -d '' f; do
+                    local base
+                    base=$(basename "$f")
+                    local txt="${f%.*}.txt"
+                    if [ ! -f "$txt" ] && [ ! -f "${f}.processing" ]; then
+                        pending+="• $base\n"
+                        count=$((count + 1))
+                    fi
+                done < <(find "$inbox_dir" -maxdepth 2 -name "*.$ext" -print0 2>/dev/null)
+            done
+
+            if [ "$count" -eq 0 ]; then
+                echo ""
+                return
+            fi
+
+            printf "<b>🎙 Аудио для транскрипции: %d</b>\n\n" "$count"
+            printf "%b\n" "$pending"
+            printf "Открой <b>Buzz</b> для транскрипции."
+            ;;
+
         *)
             echo ""
             ;;

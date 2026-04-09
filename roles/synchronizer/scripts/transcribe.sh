@@ -15,10 +15,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INBOX_DIR="/Users/andrey_akatov/IWE/DS-strategy/inbox"
-MODEL="${WHISPER_MODEL:-$HOME/.local/share/whisper-cpp/models/ggml-large-v3-turbo.bin}"
-WHISPER_CLI="/usr/local/bin/whisper-cli"
-FFMPEG="/usr/local/bin/ffmpeg"
 EXTENSIONS="m4a mp4 wav mp3 webm"
+# Транскрипция через Buzz (GUI) — скрипт только детектирует и уведомляет
 LOG_DIR="/Users/andrey_akatov/logs/synchronizer"
 
 DRY_RUN=false
@@ -29,27 +27,13 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [transcribe] $1" >> "$LOG_DIR/transcribe-$(date +%Y-%m-%d).log" 2>/dev/null || true
 }
 
-# Check dependencies
-if [ ! -f "$WHISPER_CLI" ]; then
-    log "ERROR: whisper-cli not found at $WHISPER_CLI"
-    exit 1
-fi
-
-if [ ! -f "$MODEL" ]; then
-    log "ERROR: model not found at $MODEL. Download: curl -L -o $MODEL https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
-    exit 1
-fi
-
-if [ ! -f "$FFMPEG" ]; then
-    log "ERROR: ffmpeg not found at $FFMPEG"
-    exit 1
-fi
+# No CLI dependencies needed — Buzz handles transcription
 
 log "=== Transcribe Started ==="
 
 # Scan for audio files
 found=0
-processed=0
+pending_files=()
 
 for ext in $EXTENSIONS; do
     while IFS= read -r -d '' audio_file; do
@@ -79,32 +63,21 @@ for ext in $EXTENSIONS; do
 
         if [ "$DRY_RUN" = true ]; then
             log "DRY RUN: would transcribe $basename_file"
+            pending_files+=("$basename_file")
             continue
         fi
 
-        log "TRANSCRIBING: $basename_file"
-        touch "$processing_file"
-
-        # Convert to WAV 16kHz mono (whisper-cpp requirement)
-        wav_tmp="/tmp/whisper_$(date +%s).wav"
-        if ! "$FFMPEG" -i "$audio_file" -ar 16000 -ac 1 -c:a pcm_s16le "$wav_tmp" -y -loglevel error 2>&1; then
-            log "ERROR: ffmpeg conversion failed for $basename_file"
-            rm -f "$processing_file" "$wav_tmp"
-            continue
-        fi
-
-        # Run whisper-cpp
-        if "$WHISPER_CLI" -m "$MODEL" -f "$wav_tmp" -l ru --output-txt -of "${audio_file%.*}" 2>&1 | tail -3; then
-            log "DONE: $basename_file → ${basename_file%.*}.txt"
-            processed=$((processed + 1))
-        else
-            log "ERROR: whisper-cli failed for $basename_file"
-        fi
-
-        # Cleanup
-        rm -f "$processing_file" "$wav_tmp"
+        pending_files+=("$basename_file")
+        log "PENDING: $basename_file (открой Buzz для транскрипции)"
 
     done < <(find "$INBOX_DIR" -maxdepth 2 -name "*.$ext" -print0 2>/dev/null)
 done
 
-log "=== Transcribe Completed: $found found, $processed transcribed ==="
+pending_count=${#pending_files[@]}
+log "=== Transcribe Completed: $found found, $pending_count pending ==="
+
+# Notify via Telegram if there are pending files
+if [ "$pending_count" -gt 0 ] && [ "$DRY_RUN" = false ]; then
+    file_list=$(printf '• %s\n' "${pending_files[@]}")
+    "$SCRIPT_DIR/notify.sh" synchronizer audio-pending 2>/dev/null || log "WARN: notification failed"
+fi
