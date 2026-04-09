@@ -38,6 +38,35 @@ build_message() {
             fi
             ;;
 
+        "health-alert")
+            local state_dir="$HOME/.local/state/exocortex"
+            local issues=""
+            local failed_tasks=""
+
+            # Check critical tasks
+            if [ ! -f "$state_dir/synchronizer-code-scan-$DATE" ]; then
+                failed_tasks+="code-scan, "
+            fi
+            if [ ! -f "$state_dir/strategist-morning-$DATE" ] && (( 10#$(date +%H) >= 6 )); then
+                failed_tasks+="strategist morning, "
+            fi
+
+            if [ -z "$failed_tasks" ]; then
+                echo ""
+                return
+            fi
+
+            failed_tasks="${failed_tasks%, }"
+
+            printf "<b>🔴 Health Alert</b>\n\n"
+            printf "📅 %s\n\n" "$DATE"
+            printf "<b>Не запустились:</b> %s\n\n" "$failed_tasks"
+            printf "Проверь логи:\n"
+            printf "<code>cat ~/logs/synchronizer/launchd-scheduler.log | tail -20</code>\n\n"
+            printf "Ручной запуск:\n"
+            printf "<code>cd ~/IWE/FMT-exocortex-template && bash roles/synchronizer/scripts/scheduler.sh dispatch</code>"
+            ;;
+
         *)
             echo ""
             ;;

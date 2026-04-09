@@ -257,6 +257,12 @@ log "=== Daily Report Started ==="
 
 REPORT=$(generate_report)
 
+# Health-check alert: notify on RED
+tl_color=$(compute_traffic_light | cut -d'|' -f2)
+if echo "$tl_color" | grep -q "Критический"; then
+    "$SCRIPT_DIR/notify.sh" synchronizer health-alert 2>/dev/null || log "WARN: health-alert notification failed"
+fi
+
 if [ "$DRY_RUN" = true ]; then
     echo "$REPORT"
     log "DRY RUN — отчёт не записан"
