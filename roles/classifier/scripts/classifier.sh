@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2155,SC2034  # local+assign pattern, ARTICLE used for logging
 # ТНВЭД Classifier Agent Runner
 # Сканирует inbox → подготавливает данные → классифицирует через Claude CLI
 #
