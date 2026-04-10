@@ -72,9 +72,28 @@ def extract_images(xlsx_path: str, out_dir: str) -> dict:
     return image_map
 
 
+def fix_xlsx_case(xlsx_path: str) -> str:
+    """Fix case-sensitivity issue with SharedStrings.xml."""
+    import tempfile
+    z = zipfile.ZipFile(xlsx_path)
+    names = z.namelist()
+    if 'xl/SharedStrings.xml' in names and 'xl/sharedStrings.xml' not in names:
+        tmp = tempfile.mktemp(suffix='.xlsx')
+        with zipfile.ZipFile(xlsx_path, 'r') as zin, zipfile.ZipFile(tmp, 'w') as zout:
+            for item in zin.infolist():
+                data = zin.read(item.filename)
+                if item.filename == 'xl/SharedStrings.xml':
+                    item.filename = 'xl/sharedStrings.xml'
+                zout.writestr(item, data)
+        return tmp
+    z.close()
+    return xlsx_path
+
+
 def extract_articles(xlsx_path: str, image_map: dict) -> list:
     """Extract unique articles with text data."""
-    wb = openpyxl.load_workbook(xlsx_path)
+    fixed_path = fix_xlsx_case(xlsx_path)
+    wb = openpyxl.load_workbook(fixed_path)
     ws = wb[wb.sheetnames[0]]
 
     seen = set()
