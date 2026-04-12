@@ -1,5 +1,5 @@
 #!/bin/bash
-# shellcheck disable=SC2034,SC2064  # Variables used in later stages; trap with double quotes is intentional (expand at definition time)
+# shellcheck disable=SC2034,SC2064  # Variables used in later stages; trap with double quotes is intentional
 # Exocortex Update — загрузка обновлений платформы из FMT-exocortex-template
 #
 # Использование:
