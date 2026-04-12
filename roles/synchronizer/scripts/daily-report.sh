@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034  # Platform-level; tracked upstream
 # daily-report.sh — ежедневный отчёт работы scheduler
 #
 # Формирует отчёт: что должно было сработать, что сработало, что нет.

@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034  # Platform-level; tracked upstream
 # Шаблон уведомлений: Стратег (R1)
 # Вызывается из notify.sh через source
 

@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034  # Platform-level; tracked upstream
 # Validate Template — проверка целостности FMT-exocortex-template
 #
 # 6 проверок:

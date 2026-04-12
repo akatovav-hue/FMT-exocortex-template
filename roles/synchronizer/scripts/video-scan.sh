@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034  # Platform-level; tracked upstream
 # video-scan.sh — сканирование видеозаписей и привязка к РП
 #
 # Обходит директории видеозаписей (Zoom, Телемост и др.), находит

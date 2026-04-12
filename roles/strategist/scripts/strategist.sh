@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC1090,SC2064  # Platform-level; tracked upstream
 # Strategist (Стратег) Agent Runner
 # Запускает Claude Code с заданным сценарием
 

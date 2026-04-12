@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC1090  # Platform-level; tracked upstream
 # Fetch WakaTime stats for Strategist prompts
 # Usage: fetch-wakatime.sh <mode>
 #   mode: "today" — today's summary, all projects (for day-close)

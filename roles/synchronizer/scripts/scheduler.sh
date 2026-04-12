@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034  # Platform-level; tracked upstream
 # scheduler.sh — центральный диспетчер агентов экзокортекса
 #
 # Вызывается launchd (com.exocortex.scheduler) в нужные моменты.
