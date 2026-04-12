@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2034  # Variables used indirectly or reserved for future use
 # daily-report.sh — ежедневный отчёт работы scheduler
 #
 # Формирует отчёт: что должно было сработать, что сработало, что нет.
@@ -257,12 +256,6 @@ log "=== Daily Report Started ==="
 
 REPORT=$(generate_report)
 
-# Health-check alert: notify on RED
-tl_color=$(compute_traffic_light | cut -d'|' -f2)
-if echo "$tl_color" | grep -q "Критический"; then
-    "$SCRIPT_DIR/notify.sh" synchronizer health-alert 2>/dev/null || log "WARN: health-alert notification failed"
-fi
-
 if [ "$DRY_RUN" = true ]; then
     echo "$REPORT"
     log "DRY RUN — отчёт не записан"
@@ -273,12 +266,12 @@ else
     cd "$COMMIT_DIR"
     # Staging Isolation: stash → pull → pop → reset → add only own files
     # Without stash, pull --rebase fails when Claude sessions leave unstaged changes
+    stash_count_before=""
+    stash_count_after=""
     stash_count_before=$(git stash list 2>/dev/null | wc -l)
-    stash_count_after=0
     git stash -u --quiet 2>/dev/null || true
     git pull --rebase --quiet 2>/dev/null || log "WARN: pull --rebase failed (offline?)"
     stash_count_after=$(git stash list 2>/dev/null | wc -l)
-
     if [ "$stash_count_after" -gt "$stash_count_before" ]; then
         git stash pop --quiet 2>/dev/null || log "WARN: stash pop failed"
     fi

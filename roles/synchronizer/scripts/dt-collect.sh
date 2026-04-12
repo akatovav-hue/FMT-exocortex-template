@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC1090  # source paths are dynamic
 # dt-collect.sh — сбор данных активности для ЦД (WP-106, WP-139)
 #
 # Архитектура: ядро (L3, шаблон) + плагины (L4, personal)
@@ -86,12 +85,12 @@ collect_wakatime() {
     TODAY_RESP=$(curl -s -H "Authorization: Basic $ENCODED" "$API/summaries?start=$DATE&end=$DATE" 2>/dev/null || echo "{}")
 
     # Last 7 days
-    local D7; D7=$(portable_date_offset 7)
+    local D7=$(portable_date_offset 7)
     local WEEK_RESP
     WEEK_RESP=$(curl -s -H "Authorization: Basic $ENCODED" "$API/summaries?start=$D7&end=$DATE" 2>/dev/null || echo "{}")
 
     # Last 30 days
-    local D30; D30=$(portable_date_offset 30)
+    local D30=$(portable_date_offset 30)
     local MONTH_RESP
     MONTH_RESP=$(curl -s -H "Authorization: Basic $ENCODED" "$API/summaries?start=$D30&end=$DATE" 2>/dev/null || echo "{}")
 
@@ -291,7 +290,7 @@ print(json.dumps(result))
 # ============================================================
 
 collect_wp() {
-    local MEMORY_FILE; MEMORY_FILE="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/MEMORY.md"
+    local MEMORY_FILE="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/MEMORY.md"
 
     python3 -c "
 import json, os, re

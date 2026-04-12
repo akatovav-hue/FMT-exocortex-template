@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2034  # Variables used indirectly by caller (notify.sh sources this file)
 # Шаблон уведомлений: Синхронизатор (R8)
 # Вызывается из notify.sh через source
 
@@ -37,62 +36,6 @@ build_message() {
             if [ "$found" -gt 0 ]; then
                 printf "<b>Репо:</b>\n%s" "$repo_list"
             fi
-            ;;
-
-        "health-alert")
-            local state_dir="$HOME/.local/state/exocortex"
-            local issues=""
-            local failed_tasks=""
-
-            # Check critical tasks
-            if [ ! -f "$state_dir/synchronizer-code-scan-$DATE" ]; then
-                failed_tasks+="code-scan, "
-            fi
-            if [ ! -f "$state_dir/strategist-morning-$DATE" ] && (( 10#$(date +%H) >= 6 )); then
-                failed_tasks+="strategist morning, "
-            fi
-
-            if [ -z "$failed_tasks" ]; then
-                echo ""
-                return
-            fi
-
-            failed_tasks="${failed_tasks%, }"
-
-            printf "<b>🔴 Health Alert</b>\n\n"
-            printf "📅 %s\n\n" "$DATE"
-            printf "<b>Не запустились:</b> %s\n\n" "$failed_tasks"
-            printf "Проверь логи:\n"
-            printf "<code>cat ~/logs/synchronizer/launchd-scheduler.log | tail -20</code>\n\n"
-            printf "Ручной запуск:\n"
-            printf "<code>cd ~/IWE/FMT-exocortex-template && bash roles/synchronizer/scripts/scheduler.sh dispatch</code>"
-            ;;
-
-        "audio-pending")
-            local inbox_dir="/Users/andrey_akatov/IWE/DS-strategy/inbox"
-            local pending=""
-            local count=0
-
-            for ext in m4a mp4 wav mp3 webm; do
-                while IFS= read -r -d '' f; do
-                    local base
-                    base=$(basename "$f")
-                    local txt="${f%.*}.txt"
-                    if [ ! -f "$txt" ] && [ ! -f "${f}.processing" ]; then
-                        pending+="• $base\n"
-                        count=$((count + 1))
-                    fi
-                done < <(find "$inbox_dir" -maxdepth 2 -name "*.$ext" -print0 2>/dev/null)
-            done
-
-            if [ "$count" -eq 0 ]; then
-                echo ""
-                return
-            fi
-
-            printf "<b>🎙 Аудио для транскрипции: %d</b>\n\n" "$count"
-            printf "%b\n" "$pending"
-            printf "Открой <b>Buzz</b> для транскрипции."
             ;;
 
         *)

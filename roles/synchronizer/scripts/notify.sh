@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC1090  # source paths are dynamic
 # notify.sh — единый dispatch уведомлений экзокортекса
 #
 # Использование:
@@ -17,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATES_DIR="$SCRIPT_DIR/templates"
 ENV_FILE="$HOME/.config/aist/env"
 
-AVAILABLE=$(find "$TEMPLATES_DIR" -maxdepth 1 -name "*.sh" -print0 2>/dev/null | xargs -0 -I{} basename {} .sh | tr '\n' '|' | sed 's/|$//')
+AVAILABLE=$(ls "$TEMPLATES_DIR"/*.sh 2>/dev/null | xargs -I{} basename {} .sh | tr '\n' '|' | sed 's/|$//')
 AGENT="${1:?Ошибка: укажи агента (${AVAILABLE:-нет шаблонов})}"
 SCENARIO="${2:?Ошибка: укажи сценарий}"
 

@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2034  # Variables used indirectly
 # video-scan.sh — сканирование видеозаписей и привязка к РП
 #
 # Обходит директории видеозаписей (Zoom, Телемост и др.), находит

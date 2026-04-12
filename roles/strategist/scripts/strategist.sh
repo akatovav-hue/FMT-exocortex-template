@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2034,SC1090  # Vars used indirectly; source paths are dynamic
 # Strategist (Стратег) Agent Runner
 # Запускает Claude Code с заданным сценарием
 
@@ -100,7 +99,7 @@ ${prompt}"
 
     # Запуск Claude Code с содержимым команды как промпт (с timeout-защитой)
     local rc=0
-    timeout "$CLAUDE_TIMEOUT" "$CLAUDE_PATH" --allow-dangerously-skip-permissions \
+    timeout "$CLAUDE_TIMEOUT" "$CLAUDE_PATH" --dangerously-skip-permissions \
         --allowedTools "Read,Write,Edit,Glob,Grep,Bash" \
         -p "$prompt" \
         >> "$LOG_FILE" 2>&1 || rc=$?
@@ -111,7 +110,11 @@ ${prompt}"
         log "WARN: Claude CLI exited with code $rc for scenario: $command_file"
     fi
 
-    log "Completed scenario: $command_file"
+    if [ $rc -eq 0 ]; then
+        log "SUCCESS scenario: $command_file"
+    else
+        log "FAILED scenario: $command_file (rc=$rc)"
+    fi
 
     # Push changes to GitHub (чтобы бот мог читать через API)
     if git -C "$WORKSPACE" diff --quiet origin/main..HEAD 2>/dev/null; then
@@ -130,12 +133,13 @@ ${prompt}"
     local summary
     summary=$(tail -5 "$LOG_FILE" | grep -v '^\[' | head -3)
     notify "Стратег: $command_file" "$summary"
+    return $rc
 }
 
 # Проверка: уже запускался ли сценарий сегодня
 already_ran_today() {
     local scenario="$1"
-    [ -f "$LOG_FILE" ] && grep -q "Completed scenario: $scenario" "$LOG_FILE"
+    [ -f "$LOG_FILE" ] && grep -q "SUCCESS scenario: $scenario" "$LOG_FILE"
 }
 
 # File-based lock to prevent concurrent execution (RunAtLoad + CalendarInterval race)
@@ -159,7 +163,7 @@ acquire_lock() {
         fi
     fi
     echo $$ > "$lockdir/pid" || { rm -rf "$lockdir"; log "ERROR: failed to write PID for $scenario"; exit 1; }
-    trap 'rm -rf "$lockdir" 2>/dev/null' EXIT
+    trap "rm -rf \"$lockdir\" 2>/dev/null" EXIT
 }
 
 # Читаем strategy_day из конфига (L4 Personal)
@@ -261,7 +265,7 @@ case "$1" in
 
         # Deterministic cleanup: archive non-bold, non-🔄 notes (safety net for LLM Step 10)
         log "Running deterministic cleanup..."
-        CLEANUP_OUTPUT=$(bash "$SCRIPT_DIR/cleanup-processed-notes.sh" 2>&1) || true
+        CLEANUP_OUTPUT=$(python3 "$SCRIPT_DIR/cleanup-processed-notes.py" 2>&1) || true
         log "Cleanup: $CLEANUP_OUTPUT"
 
         # If cleanup made changes, commit and push

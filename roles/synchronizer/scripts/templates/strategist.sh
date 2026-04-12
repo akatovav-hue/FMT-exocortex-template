@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2034  # Variables used by caller via source
 # Шаблон уведомлений: Стратег (R1)
 # Вызывается из notify.sh через source
 

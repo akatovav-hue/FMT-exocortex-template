@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2034  # Variables reserved for future use
 # PreCompact Checkpoint Hook
 # Event: PreCompact
 # Перед компрессией контекста сохраняет checkpoint: что осталось сделать.

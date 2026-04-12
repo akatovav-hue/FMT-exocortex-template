@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC1090  # source paths are dynamic
 # Knowledge Extractor Agent Runner
 # Запускает Claude Code с заданным процессом KE
 #
@@ -23,7 +22,7 @@ ENV_FILE="/Users/andrey_akatov/.config/aist/env"
 # AI CLI: переопределение через переменные окружения (см. strategist.sh)
 AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
-AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---allow-dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
 
 # Создаём папку для логов
 mkdir -p "$LOG_DIR"
