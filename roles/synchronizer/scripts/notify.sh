@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC1090,SC2011  # Platform-level; tracked upstream
 # notify.sh — единый dispatch уведомлений экзокортекса
 #
 # Использование:

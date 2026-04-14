@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2034  # Platform-level; tracked upstream
 # Настройка Agent Workspace — отдельный репозиторий для данных агентов
 #
 # Зачем: Когда у тебя >2 автономных агента (Scout, Стратег, Экстрактор),

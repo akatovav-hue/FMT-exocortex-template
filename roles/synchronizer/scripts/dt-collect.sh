@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC1090,SC2155  # Platform-level; tracked upstream
 # dt-collect.sh — сбор данных активности для ЦД (WP-106, WP-139)
 #
 # Архитектура: ядро (L3, шаблон) + плагины (L4, personal)

@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC1090  # Platform-level; tracked upstream
 # Knowledge Extractor Agent Runner
 # Запускает Claude Code с заданным процессом KE
 #

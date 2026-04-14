@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC1090,SC2064  # Platform-level; tracked upstream
 # Strategist (Стратег) Agent Runner
 # Запускает Claude Code с заданным сценарием
 
@@ -266,7 +265,7 @@ case "$1" in
 
         # Deterministic cleanup: archive non-bold, non-🔄 notes (safety net for LLM Step 10)
         log "Running deterministic cleanup..."
-        CLEANUP_OUTPUT=$(bash "$SCRIPT_DIR/cleanup-processed-notes.sh" 2>&1) || true
+        CLEANUP_OUTPUT=$(python3 "$SCRIPT_DIR/cleanup-processed-notes.py" 2>&1) || true
         log "Cleanup: $CLEANUP_OUTPUT"
 
         # If cleanup made changes, commit and push
