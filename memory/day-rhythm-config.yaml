@@ -7,8 +7,9 @@ day_open:
   self_dev_slot: 1              # Slot number for self-development (always first by default)
   self_dev_missing_alert: true  # Explicitly say if no self-dev in today's plan
   interactive: false            # false = Day Open одним блоком. true = промежуточные вопросы.
-  calendar_ids: []              # Calendar IDs to check. Empty = all available calendars.
-                                # Examples: ['primary', 'work@company.com', 'team-calendar-id@group']
+  calendar_ids:                 # Calendar IDs to check. Empty = all available calendars.
+    - primary                   # akatov.av@gmail.com (личный)
+    - cf092897af4dcb1c90173078136f84905f9756c1c1bf2f2a9c29ce6ead8fbea5@group.calendar.google.com  # Битрикс24 Андрей Акатов (рабочие встречи)
 
 news:
   enabled: false                # Enable news digest at Day Open (requires WebSearch)
