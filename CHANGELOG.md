@@ -5,6 +5,11 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.25.1] — 2026-04-14
+
+### Changed
+- **protocol-close.md** — KE (Knowledge Extraction) добавлен как обязательный шаг 2.5 Quick Close. Знание маршрутизируется в момент сессии (горячий контекст), не откладывается на Day Close. Чеклист Quick Close дополнен строкой KE. Секция Deferred обновлена: KE выведен из отложенных.
+
 ## [0.25.0] — 2026-04-13
 
 ### Changed
