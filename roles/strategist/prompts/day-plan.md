@@ -86,20 +86,25 @@ git -C /Users/andrey_akatov/Github/<repo> log --since="yesterday 00:00" --until=
 
 ### 3c. Проверка незалитых коммитов бота (pilot → new-architecture)
 
+> Секция выполняется **только если** задана env var `$BOT_REPO_DIR` (путь к репо бота с двумя ветками). Не задана → пропустить секцию целиком.
 > **ВАЖНО:** Используй `git cherry`, а НЕ `git log A..B`. Cherry-pick создаёт новые SHA — `git log` считает их «отсутствующими», хотя содержимое идентичное. `git cherry` сравнивает по patch-id (содержимому).
 
 ```bash
+# Требуется: $BOT_REPO_DIR (из ~/.config/aist/env). Имена веток: BOT_BRANCH_PILOT, BOT_BRANCH_PROD (defaults: pilot, new-architecture)
+[ -n "${BOT_REPO_DIR:-}" ] && [ -d "$BOT_REPO_DIR" ] || exit 0
+BOT_BRANCH_PILOT="${BOT_BRANCH_PILOT:-pilot}"
+BOT_BRANCH_PROD="${BOT_BRANCH_PROD:-new-architecture}"
 # Коммиты на pilot, отсутствующие на prod (+ = реально отсутствует, - = уже cherry-picked)
-git -C /Users/andrey_akatov/Github/DS-IT-systems/aist_pilot_bot cherry -v new-architecture pilot 2>/dev/null | grep '^\+'
+git -C "$BOT_REPO_DIR" cherry -v "$BOT_BRANCH_PROD" "$BOT_BRANCH_PILOT" 2>/dev/null | grep '^\+'
 # Коммиты на prod, отсутствующие на pilot (обратное направление)
-git -C /Users/andrey_akatov/Github/DS-IT-systems/aist_pilot_bot cherry -v pilot new-architecture 2>/dev/null | grep '^\+'
+git -C "$BOT_REPO_DIR" cherry -v "$BOT_BRANCH_PILOT" "$BOT_BRANCH_PROD" 2>/dev/null | grep '^\+'
 ```
 
 - Если есть коммиты с `+` в любом направлении → добавить в DayPlan секцию с ТОЧНЫМ числом:
   ```
   **🤖 Бот: рассинхрон веток:** N коммитов на pilot (не на prod), M коммитов на prod (не на pilot). Команда для синхронизации: «мержи на прод».
   ```
-- Если коммитов с `+` нет → не включать секцию (ветки синхронизированы)
+- Если коммитов с `+` нет или `$BOT_REPO_DIR` не задан → не включать секцию.
 
 > Сценарий merge: PROCESSES.md § 4.2. Merge выполняется ТОЛЬКО по команде пользователя.
 
