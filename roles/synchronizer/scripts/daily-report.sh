@@ -12,7 +12,6 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_DIR="$HOME/.local/state/exocortex"
 LOG_DIR="/Users/andrey_akatov/logs/synchronizer"
 STRATEGY_DIR="/Users/andrey_akatov/IWE/DS-strategy"
@@ -41,7 +40,6 @@ DRY_RUN=false
 
 REPORT_FILE="$REPORT_DIR/SchedulerReport $DATE.md"
 SCHEDULER_LOG="$LOG_DIR/scheduler-$DATE.log"
-STRATEGIST_LOG="/Users/andrey_akatov/logs/strategist/$DATE.log"
 
 mkdir -p "$ARCHIVE_DIR"
 

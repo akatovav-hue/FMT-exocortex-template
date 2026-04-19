@@ -57,6 +57,7 @@ notify_telegram() {
 load_env() {
     if [ -f "$ENV_FILE" ]; then
         set -a
+        # shellcheck source=/dev/null # runtime-resolved path
         source "$ENV_FILE"
         set +a
     fi

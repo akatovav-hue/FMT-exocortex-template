@@ -67,9 +67,6 @@ fi
 echo ""
 echo "→ Создаю репозиторий..."
 
-# Определяем GitHub username
-GH_USER=$(gh api user -q '.login')
-
 cd "$WORKSPACE"
 
 # Создаём репо
