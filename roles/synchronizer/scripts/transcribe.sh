@@ -17,7 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INBOX_DIR="/Users/andrey_akatov/IWE/DS-strategy/inbox"
 EXTENSIONS="m4a mp4 wav mp3 webm"
 # Транскрипция через Buzz (GUI) — скрипт только детектирует и уведомляет
-LOG_DIR="/Users/andrey_akatov/logs/synchronizer"
+LOG_DIR="$HOME/logs/synchronizer"
 
 DRY_RUN=false
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=true

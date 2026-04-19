@@ -15,7 +15,7 @@ WORKSPACE="/Users/andrey_akatov/IWE"
 INBOX_DIR="$WORKSPACE/DS-strategy/inbox/classifier"
 OUTPUT_DIR="$WORKSPACE/DS-strategy/inbox/classifier/done"
 PROMPTS_DIR="$ROLE_DIR/prompts"
-LOG_DIR="/Users/andrey_akatov/logs/classifier"
+LOG_DIR="$HOME/logs/classifier"
 CLAUDE_PATH="claude"
 BATCH_SIZE=10  # артикулов за один вызов claude
 

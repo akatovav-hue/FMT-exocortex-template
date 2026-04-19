@@ -3,12 +3,12 @@
 
 Выполни сценарий Day Plan для роли Стратег (R1).
 
-Источник сценария: /Users/andrey_akatov/Github/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/02-day-plan.md
+Источник сценария: /Users/andrey_akatov/IWE/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/02-day-plan.md
 
 ## Контекст
 
-- **HUB (личные планы):** /Users/andrey_akatov/Github/DS-strategy/current/
-- **SPOKE (планы репо):** /Users/andrey_akatov/Github/*/WORKPLAN.md
+- **HUB (личные планы):** /Users/andrey_akatov/IWE/DS-strategy/current/
+- **SPOKE (планы репо):** /Users/andrey_akatov/IWE/*/WORKPLAN.md
 - **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
 ## Именование файлов в current/
@@ -30,11 +30,11 @@ DS-strategy/
 **Стратег ОБЯЗАН** собрать коммиты за вчерашний день самостоятельно:
 
 ```bash
-# Для КАЖДОГО репо в /Users/andrey_akatov/Github/:
-git -C /Users/andrey_akatov/Github/<repo> log --since="yesterday 00:00" --until="today 00:00" --oneline --no-merges
+# Для КАЖДОГО репо в /Users/andrey_akatov/IWE/:
+git -C /Users/andrey_akatov/IWE/<repo> log --since="yesterday 00:00" --until="today 00:00" --oneline --no-merges
 ```
 
-- Пройди по ВСЕМ репозиториям в `/Users/andrey_akatov/Github/`
+- Пройди по ВСЕМ репозиториям в `/Users/andrey_akatov/IWE/`
 - Сгруппируй коммиты по репозиториям
 - Сопоставь коммиты с РП из недельного плана
 - Определи статус каждого затронутого РП: done / partial / not started
