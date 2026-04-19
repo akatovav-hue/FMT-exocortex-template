@@ -13,7 +13,7 @@
 set -euo pipefail
 
 STATE_DIR="$HOME/.local/state/exocortex"
-LOG_DIR="/Users/andrey_akatov/logs/synchronizer"
+LOG_DIR="$HOME/logs/synchronizer"
 STRATEGY_DIR="/Users/andrey_akatov/IWE/DS-strategy"
 
 # Agent Workspace: если существует — отчёты идут туда
