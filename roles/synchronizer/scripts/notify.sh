@@ -16,13 +16,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATES_DIR="$SCRIPT_DIR/templates"
 ENV_FILE="$HOME/.config/aist/env"
 
-AVAILABLE=$(ls "$TEMPLATES_DIR"/*.sh 2>/dev/null | xargs -I{} basename {} .sh | tr '\n' '|' | sed 's/|$//')
+AVAILABLE=$(find "$TEMPLATES_DIR" -maxdepth 1 -name "*.sh" -print0 2>/dev/null | xargs -0 -I{} basename {} .sh | tr '\n' '|' | sed 's/|$//')
 AGENT="${1:?Ошибка: укажи агента (${AVAILABLE:-нет шаблонов})}"
 SCENARIO="${2:?Ошибка: укажи сценарий}"
 
 # Загрузка env
 if [ -f "$ENV_FILE" ]; then
     set -a
+    # shellcheck source=/dev/null # runtime-resolved path
     source "$ENV_FILE"
     set +a
 fi
@@ -82,6 +83,7 @@ if [ ! -f "$TEMPLATE" ]; then
     exit 1
 fi
 
+# shellcheck source=/dev/null # dynamic template path resolved at runtime
 source "$TEMPLATE"
 
 MESSAGE=$(build_message "$SCENARIO")

@@ -64,6 +64,7 @@ WORKSPACE_DIR="$(dirname "$SCRIPT_DIR")"
 
 # === Temp directory ===
 TMPDIR_UPDATE=$(mktemp -d 2>/dev/null || { mkdir -p "/tmp/exocortex-update-$$"; echo "/tmp/exocortex-update-$$"; })
+# shellcheck disable=SC2064 # intentional early expansion: $TMPDIR_UPDATE captured at trap registration
 trap "rm -rf '$TMPDIR_UPDATE'" EXIT
 
 echo "=========================================="
@@ -390,6 +391,7 @@ else
     echo "  Попытка восстановления конфигурации..."
 
     DETECTED_WORKSPACE="$WORKSPACE_DIR"
+    # shellcheck disable=SC2034 # reserved for future ENVEOF expansion
     DETECTED_REPO="$(basename "$SCRIPT_DIR")"
 
     cat > "$ENV_FILE" <<ENVEOF
@@ -476,6 +478,7 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
         CLAUDE_UPDATED=true
     fi
 done
+[ "$CLAUDE_UPDATED" = "true" ] && echo "  CLAUDE.md merge завершён."
 
 # Copy memory files to Claude projects directory
 CLAUDE_PROJECT_SLUG="$(echo "$WORKSPACE_DIR" | tr '/' '-')"
@@ -557,6 +560,7 @@ MCP_TEMPLATE_CHANGED=false
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     if [ "$f" = ".mcp.json" ]; then MCP_TEMPLATE_CHANGED=true; break; fi
 done
+[ "$MCP_TEMPLATE_CHANGED" = "true" ] && echo "  .mcp.json изменён — будет проверена миграция."
 
 # === Step 6c: Migrate workspace .mcp.json to Gateway ===
 # Strategy: migrate in-place first (preserving user servers), then fallback to template copy.

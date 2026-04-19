@@ -17,7 +17,10 @@ portable_date_offset() {
 
 ENV_FILE="$HOME/.config/aist/env"
 if [ -f "$ENV_FILE" ]; then
-    set -a; source "$ENV_FILE"; set +a
+    set -a
+    # shellcheck source=/dev/null # runtime-resolved path
+    source "$ENV_FILE"
+    set +a
 fi
 
 if [ -z "$WAKATIME_API_KEY" ]; then

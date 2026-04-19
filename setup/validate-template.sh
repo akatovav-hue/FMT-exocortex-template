@@ -125,7 +125,6 @@ done
 # вместо абсолютных путей к FMT-exocortex-template/scripts|roles.
 echo -n "[6/6] Hardcoded script paths in protocols/skills... "
 CHECK6_FAIL=0
-CHECK6_FILES=""
 for pattern in 'FMT-exocortex-template/scripts' 'FMT-exocortex-template/roles/[a-z]*/scripts'; do
     hits=$(grep -rnE "$pattern" \
             "$TEMPLATE_DIR/memory" \
