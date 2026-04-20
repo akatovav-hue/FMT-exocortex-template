@@ -5,6 +5,40 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.26.4] — 2026-04-18
+
+### Added
+- **.claude/skills/ke/SKILL.md** — блок `## Scope` разграничивает три инструмента знания в IWE: `/ke` (inline capture, R14/R1), `extractor.sh inbox-check` (R2 launchd 3h work hours, создаёт `extraction-reports/*.md` со `status: pending-review`), `/apply-captures` (R15 Валидатор, в разработке). Явно указано что скилл делает и чего НЕ делает. Предотвращает будущий P10-дубликат scope при появлении `/apply-captures`. Источник: WP-247 Ф3.0 — IntegrationGate для скилла разбора extraction-reports.
+
+### Fixed
+- **roles/strategist/prompts/session-prep.md** (шаг 6, очистка `extraction-reports/`) — условие удаления учитывает `status` во frontmatter: удаляются только `applied` / `rejected` / `no-pending` (старше 7 дней). Статусы `pending-review` / `partially-applied` / `deferred` защищены — реализация инварианта «capture не исчезает без решения». Инцидент 17 апр: прежнее правило «старше 7 дней → удалить» удалило 6 pending-review отчётов (6-10 апр) вместе с неразобранными кандидатами. Источник: WP-247 Ф5.
+
+## [0.26.3] — 2026-04-18
+
+### Fixed
+- **docs/LEARNING-PATH.md** (§5.1b Session Open), **roles/synchronizer/scripts/dt-collect.sh** (collect_sessions) — путь к session log приведён к канону `DS-my-strategy/inbox/open-sessions.log` (вариант для FMT: `<governance-repo>/inbox/open-sessions.log`). Ранее устаревший путь `DS-agent-workspace/scheduler/open-sessions.log` оставался в LEARNING-PATH и dt-collect.sh — агенты/скрипты при чтении документации могли промахнуться. Каноничное место ведения — governance-репо пользователя (там же читает CI workflow `cloud-scheduler.yml`), формат остаётся plain text. Источник: WP-248 drift cleanup (ArchGate PASS, отказ от §5.7/YAML из-за совместимости с CI).
+
+## [0.26.2] — 2026-04-17
+
+### Fixed
+- **roles/extractor/prompts/inbox-check.md** — шаг 1.3 «напиши в лог `No pending captures in inbox`» теперь явно запрещает создавать отдельный лог-файл в `DS-strategy/` или где-либо ещё. Сообщение выводится через stdout и попадает в `/Users/andrey_akatov/logs/extractor/YYYY-MM-DD.log` (поток extractor.sh). Причина: у автора накопились 3 runtime-артефакта в `inbox/` (хаотичное размещение `inbox-check.log`, `extraction-reports/inbox-check.log`, `.inbox-check-log` — нарушение OwnerIntegrity: knowledge flow vs runtime).
+
+## [0.26.1] — 2026-04-17
+
+### Fixed
+- **update-manifest.json** — синхронизирован с реальным состоянием репо: добавлены пропущенные файлы `scripts/backup-icloud.sh`, `scripts/check-dirty-repos.sh` (0.26.0), `.claude/hooks/protocol-artifact-validate.sh` (0.23.0), `.claude/hooks/protocol-stop-gate.sh` (0.24.0), `docs/QUICK-START.md`. Версия бампнута с 0.23.0 до 0.26.1. Без этого фикса: Day/Week Close у пользователей падал с `No such file or directory` на новые скрипты; хуки `settings.json` ссылались на несуществующие файлы. Источник: issue #5 (Евгений Селиверстов).
+- **generate-manifest.sh** — расширены `EXCLUDE_PATTERNS`/`EXCLUDE_EXACT`: `README.en.md`, `CONTRIBUTING.md`, `LICENSE`, `params.yaml`, `extensions/day-close.after.md`, `extensions/mcp-user.json`. Регенерация манифеста больше не захватывает пользовательское пространство, которое `update.sh` обещает не трогать (см. update.sh §«Не затрагивается»).
+- **extensions/README.md** — уточнена формулировка: `update.sh` не трогает пользовательские файлы (`*.after.md`, `*.before.md`, `*.checks.md`, `mcp-user.json`), но обновляет сам `README.md` как платформенный справочник. Противоречие «никогда не трогает» vs фактического присутствия `extensions/README.md` в manifest устранено.
+
+## [0.26.0] — 2026-04-17
+
+### Added
+- **scripts/backup-icloud.sh** — еженедельный бэкап IWE в iCloud Drive. Архивирует без `.git`/`node_modules`/`.venv`, хранит 4 последних архива с ротацией. macOS only.
+- **scripts/check-dirty-repos.sh** — скан всех IWE репо (включая вложенные) на незакоммиченные изменения и незапушенные коммиты. Используется в Day Close (шаг 7г) и Week Close.
+
+### Changed
+- **week-close/SKILL.md** v1.1.0 — добавлены платформенные шаги: бэкап iCloud и скан грязных репо.
+
 ## [0.25.1] — 2026-04-14
 
 ### Changed

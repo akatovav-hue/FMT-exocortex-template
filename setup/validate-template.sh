@@ -45,31 +45,24 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" "DS-Knowle
 done
 [ "$CHECK1_FAIL" -eq 0 ] && echo "PASS"
 
-# 2. Нет ЧУЖИХ /Users/ путей (setup.sh заменяет /Users/andrey_akatov → $HOME_DIR,
-#    так что /Users/andrey_akatov/* — ПЛЕЙСХОЛДЕРЫ, не утечки).
-# FAIL только на путях с ДРУГИМИ пользователями.
-echo -n "[2/5] Foreign /Users/ paths... "
-foreign_count=$(grep -rnE '/Users/[^a/]' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
+# 2. Нет захардкоженных /Users/ путей (исключаем: шаблонные /Users/.../,
+#    validate-template.sh (мета-проверки), setup.sh (примеры вида /Users/alice/))
+echo -n "[2/5] Hardcoded /Users/ paths... "
+count=$(grep -rn '/Users/' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
         --include="*.json" --include="*.plist" \
         --exclude='validate-template.sh' --exclude='setup.sh' 2>/dev/null \
         | grep -v '/Users/\.\.\./' \
-        | grep -v '/Users/alice' \
         | grep -v '# .*\(/Users/\|e\.g\.\)' \
         | wc -l | tr -d ' ' || true)
-# Informational: сколько плейсхолдеров под /Users/andrey_akatov/ (substitute'ятся setup.sh)
-placeholder_count=$(grep -rn '/Users/andrey_akatov/' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-        --include="*.json" --include="*.plist" \
+if [ "$count" -gt 0 ]; then
+    echo "FAIL ($count hits)"
+    grep -rn '/Users/' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
         --exclude='validate-template.sh' --exclude='setup.sh' 2>/dev/null \
-        | wc -l | tr -d ' ' || true)
-if [ "$foreign_count" -gt 0 ]; then
-    echo "FAIL ($foreign_count foreign, $placeholder_count placeholders)"
-    grep -rnE '/Users/[^a/]' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-        --exclude='validate-template.sh' --exclude='setup.sh' 2>/dev/null \
-        | grep -v '/Users/\.\.\./' | grep -v '/Users/alice' \
+        | grep -v '/Users/\.\.\./' \
         | grep -v '# .*\(/Users/\|e\.g\.\)' | head -3 || true
     FAIL=1
 else
-    echo "PASS ($placeholder_count /Users/andrey_akatov/ placeholders — substitute'ятся setup.sh)"
+    echo "PASS"
 fi
 
 # 3. Нет захардкоженных /opt/homebrew путей (кроме README, CI, PATH в plist,
@@ -132,6 +125,7 @@ done
 # вместо абсолютных путей к FMT-exocortex-template/scripts|roles.
 echo -n "[6/6] Hardcoded script paths in protocols/skills... "
 CHECK6_FAIL=0
+CHECK6_FILES=""
 for pattern in 'FMT-exocortex-template/scripts' 'FMT-exocortex-template/roles/[a-z]*/scripts'; do
     hits=$(grep -rnE "$pattern" \
             "$TEMPLATE_DIR/memory" \

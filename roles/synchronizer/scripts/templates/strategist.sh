@@ -30,7 +30,7 @@ table_to_list() {
     sed -n "/^## ${section}/,/^---/p" "$file" \
         | grep '^|' \
         | tail -n +3 \
-        | while IFS='|' read -r _ num rp budget _priority status _rest; do
+        | while IFS='|' read -r _ num rp budget priority status _rest; do
             num=$(echo "$num" | xargs)
             rp=$(echo "$rp" | xargs | sed 's/\*\*//g')
             budget=$(echo "$budget" | xargs)

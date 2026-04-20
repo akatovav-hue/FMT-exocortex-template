@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 WORKSPACE="/Users/andrey_akatov/IWE"
 PROMPTS_DIR="$REPO_DIR/prompts"
-LOG_DIR="$HOME/logs/extractor"
+LOG_DIR="/Users/andrey_akatov/logs/extractor"
 CLAUDE_PATH="claude"
 ENV_FILE="/Users/andrey_akatov/.config/aist/env"
 
@@ -57,7 +57,6 @@ notify_telegram() {
 load_env() {
     if [ -f "$ENV_FILE" ]; then
         set -a
-        # shellcheck source=/dev/null # runtime-resolved path
         source "$ENV_FILE"
         set +a
     fi
