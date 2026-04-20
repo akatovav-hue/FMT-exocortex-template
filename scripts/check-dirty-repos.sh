@@ -18,7 +18,8 @@ check_repo() {
     cd "$dir"
 
     # Uncommitted changes
-    local changes=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    local changes
+    changes=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
     if [ "$changes" -gt 0 ]; then
         echo "⚠️  $name: $changes незакоммиченных файлов"
         git status --porcelain 2>/dev/null | head -5
@@ -27,7 +28,9 @@ check_repo() {
     fi
 
     # Unpushed commits
-    local ahead=$(git rev-list --count HEAD...@{upstream} --left-only 2>/dev/null || echo "0")
+    local ahead
+    # shellcheck disable=SC1083  # @{upstream} — git syntax, не bash brace
+    ahead=$(git rev-list --count 'HEAD...@{upstream}' --left-only 2>/dev/null || echo "0")
     if [ "$ahead" -gt 0 ]; then
         echo "↗️  $name: $ahead незапушенных коммитов"
         UNPUSHED=$((UNPUSHED + 1))
