@@ -249,9 +249,12 @@ dispatch() {
     fi
 
     # --- Синхронизатор: daily-report (после code-scan и strategist morning) ---
+    # Зависимость: daily-report ждёт успешное завершение strategist-morning (иначе маркеры
+    # читаются до morning → RED-отчёт даже если morning отработал позже).
+    # Fallback: если morning не прошёл к 9:00, report всё равно создаётся (показывает RED честно).
     if ! ran_today "synchronizer-daily-report"; then
-        if ran_today "strategist-morning" || (( 10#$HOUR >= 6 )); then
-            log "→ synchronizer daily-report (hour=$HOUR)"
+        if ran_today "strategist-morning" || (( 10#$HOUR >= 9 )); then
+            log "→ synchronizer daily-report (hour=$HOUR, morning=$(ran_today 'strategist-morning' >/dev/null 2>&1 && echo ok || echo pending))"
             if timeout "$TASK_TIMEOUT_SHORT" "$SCRIPT_DIR/daily-report.sh" >> "$LOG_FILE" 2>&1; then
                 mark_done "synchronizer-daily-report"
             else
