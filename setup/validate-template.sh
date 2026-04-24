@@ -26,50 +26,64 @@ grep_count() {
 # 1. Нет автор-специфичного контента
 echo -n "[1/5] Author-specific content... "
 CHECK1_FAIL=0
-for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" "DS-Knowledge-Index-Tseren" "DS-IT-systems" "DS-ai-systems"; do
-    # Исключаем: github.com URLs (публичные ссылки), validate-template.sh (содержит паттерны поиска)
+
+# Глобальные (запрет везде, кроме CHANGELOG и GitHub URLs)
+for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
+               "DS-Knowledge-Index-Tseren" "DS-IT-systems" "DS-ai-systems" \
+               "DS-my-strategy" "engines/tailor"; do
     count=$(grep -rn "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-            --include="*.json" --include="*.plist" --include="*.yaml" \
-            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' 2>/dev/null \
+            --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" \
+            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
+            --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'github.com/' | grep -v 'docs/adr/' | wc -l | tr -d ' ' || true)
     if [ "$count" -gt 0 ]; then
         [ "$CHECK1_FAIL" -eq 0 ] && echo "FAIL"
-        echo "  Found '$pattern' in $count non-URL locations:"
+        echo "  Found '$pattern' (global) in $count locations:"
         grep -rn "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-            --include="*.json" --include="*.plist" \
-            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' 2>/dev/null \
+            --include="*.py" --include="*.json" --include="*.plist" \
+            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
+            --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'github.com/' | grep -v 'docs/adr/' | head -3 || true
+        CHECK1_FAIL=1
+        FAIL=1
+    fi
+done
+
+# Protocol-only — запрет в протоколах/скиллах/хуках/CLAUDE.md (разрешено в README/docs/onboarding как упоминание продукта)
+for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
+               "knowledge-mcp" "gateway-mcp" "DS-agent-workspace/scheduler"; do
+    count=$(cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
+            .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null \
+            | grep -v 'CHANGELOG.md' | wc -l | tr -d ' ' || true)
+    if [ "$count" -gt 0 ]; then
+        [ "$CHECK1_FAIL" -eq 0 ] && echo "FAIL"
+        echo "  Found '$pattern' (protocol-only) in $count locations:"
+        (cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
+            .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null | head -3) || true
         CHECK1_FAIL=1
         FAIL=1
     fi
 done
 [ "$CHECK1_FAIL" -eq 0 ] && echo "PASS"
 
-# 2. Нет ЧУЖИХ /Users/ путей (setup.sh заменяет /Users/andrey_akatov → $HOME_DIR,
-#    так что /Users/andrey_akatov/* — ПЛЕЙСХОЛДЕРЫ, не утечки).
-# FAIL только на путях с ДРУГИМИ пользователями.
-echo -n "[2/5] Foreign /Users/ paths... "
-foreign_count=$(grep -rnE '/Users/[^a/]' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
+# 2. Нет захардкоженных /Users/ путей (исключаем: шаблонные /Users/.../,
+#    validate-template.sh (мета-проверки), setup.sh (примеры вида /Users/alice/))
+echo -n "[2/5] Hardcoded /Users/ paths... "
+count=$(grep -rn '/Users/' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
         --include="*.json" --include="*.plist" \
         --exclude='validate-template.sh' --exclude='setup.sh' 2>/dev/null \
         | grep -v '/Users/\.\.\./' \
-        | grep -v '/Users/alice' \
         | grep -v '# .*\(/Users/\|e\.g\.\)' \
         | wc -l | tr -d ' ' || true)
-# Informational: сколько плейсхолдеров под /Users/andrey_akatov/ (substitute'ятся setup.sh)
-placeholder_count=$(grep -rn '/Users/andrey_akatov/' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-        --include="*.json" --include="*.plist" \
+if [ "$count" -gt 0 ]; then
+    echo "FAIL ($count hits)"
+    grep -rn '/Users/' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
         --exclude='validate-template.sh' --exclude='setup.sh' 2>/dev/null \
-        | wc -l | tr -d ' ' || true)
-if [ "$foreign_count" -gt 0 ]; then
-    echo "FAIL ($foreign_count foreign, $placeholder_count placeholders)"
-    grep -rnE '/Users/[^a/]' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-        --exclude='validate-template.sh' --exclude='setup.sh' 2>/dev/null \
-        | grep -v '/Users/\.\.\./' | grep -v '/Users/alice' \
+        | grep -v '/Users/\.\.\./' \
         | grep -v '# .*\(/Users/\|e\.g\.\)' | head -3 || true
     FAIL=1
 else
-    echo "PASS ($placeholder_count /Users/andrey_akatov/ placeholders — substitute'ятся setup.sh)"
+    echo "PASS"
 fi
 
 # 3. Нет захардкоженных /opt/homebrew путей (кроме README, CI, PATH в plist,
@@ -132,6 +146,8 @@ done
 # вместо абсолютных путей к FMT-exocortex-template/scripts|roles.
 echo -n "[6/6] Hardcoded script paths in protocols/skills... "
 CHECK6_FAIL=0
+# shellcheck disable=SC2034  # CHECK6_FILES used inside loop below
+CHECK6_FILES=""
 for pattern in 'FMT-exocortex-template/scripts' 'FMT-exocortex-template/roles/[a-z]*/scripts'; do
     hits=$(grep -rnE "$pattern" \
             "$TEMPLATE_DIR/memory" \

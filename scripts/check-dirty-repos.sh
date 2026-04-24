@@ -29,8 +29,8 @@ check_repo() {
 
     # Unpushed commits
     local ahead
-    # shellcheck disable=SC1083  # @{upstream} — git syntax, не bash brace
-    ahead=$(git rev-list --count 'HEAD...@{upstream}' --left-only 2>/dev/null || echo "0")
+    # shellcheck disable=SC1083  # @{upstream} literal syntax is correct here (git ref)
+    ahead=$(git rev-list --count HEAD...@{upstream} --left-only 2>/dev/null || echo "0")
     if [ "$ahead" -gt 0 ]; then
         echo "↗️  $name: $ahead незапушенных коммитов"
         UNPUSHED=$((UNPUSHED + 1))

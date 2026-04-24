@@ -10,6 +10,11 @@ DS-exocortex-setup/
 .claude/settings.local.json
 .claude/checkpoint.md
 
+# Секреты (НИКОГДА в git) — OAuth keys, tokens, service account files
+.secrets/
+*.keys.json
+*credentials.json
+*.token
+
 # macOS
 .DS_Store
-**/.DS_Store
