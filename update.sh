@@ -64,7 +64,6 @@ WORKSPACE_DIR="$(dirname "$SCRIPT_DIR")"
 
 # === Temp directory ===
 TMPDIR_UPDATE=$(mktemp -d 2>/dev/null || { mkdir -p "/tmp/exocortex-update-$$"; echo "/tmp/exocortex-update-$$"; })
-# shellcheck disable=SC2064 # intentional early expansion: $TMPDIR_UPDATE captured at trap registration
 trap "rm -rf '$TMPDIR_UPDATE'" EXIT
 
 echo "=========================================="
@@ -137,7 +136,7 @@ while IFS='|' read -r fpath fdesc; do
         LOCAL_HASH=$(hash_file "$SCRIPT_DIR/$fpath")
         REMOTE_HASH=$(hash_file "$REMOTE_FILE")
         if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
-            DIFF_COUNT=$(diff "$SCRIPT_DIR/$fpath" "$REMOTE_FILE" 2>/dev/null | grep -c '^[<>]' || echo "?")
+            DIFF_COUNT=$(diff "$SCRIPT_DIR/$fpath" "$REMOTE_FILE" 2>/dev/null | grep -c '^[<>]' || true); DIFF_COUNT=${DIFF_COUNT:-?}
             UPDATED_FILES+=("$fpath")
             UPDATED_LINES+=("$DIFF_COUNT")
         else
@@ -266,7 +265,7 @@ for f in "${UPDATED_FILES[@]}"; do
                 cp "$NEW_FILE" "$BASE_FILE"
                 echo "  ~ $f (3-way merge, чисто)"
             else
-                CONFLICT_COUNT=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null || echo "0")
+                CONFLICT_COUNT=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null || true); CONFLICT_COUNT=${CONFLICT_COUNT:-0}
                 if [ "$CONFLICT_COUNT" -gt 0 ]; then
                     # Conflicts detected — save merged file with markers
                     cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
@@ -391,7 +390,6 @@ else
     echo "  Попытка восстановления конфигурации..."
 
     DETECTED_WORKSPACE="$WORKSPACE_DIR"
-    # shellcheck disable=SC2034 # reserved for future ENVEOF expansion
     DETECTED_REPO="$(basename "$SCRIPT_DIR")"
 
     cat > "$ENV_FILE" <<ENVEOF
@@ -452,7 +450,7 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
                 cp "$WS_NEW" "$WS_BASE"
                 echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
             else
-                WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || echo "0")
+                WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || true); WS_CONFLICTS=${WS_CONFLICTS:-0}
                 cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
                 cp "$WS_NEW" "$WS_BASE"
                 if [ "$WS_CONFLICTS" -gt 0 ]; then
@@ -478,7 +476,6 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
         CLAUDE_UPDATED=true
     fi
 done
-[ "$CLAUDE_UPDATED" = "true" ] && echo "  CLAUDE.md merge завершён."
 
 # Copy memory files to Claude projects directory
 CLAUDE_PROJECT_SLUG="$(echo "$WORKSPACE_DIR" | tr '/' '-')"
@@ -560,7 +557,6 @@ MCP_TEMPLATE_CHANGED=false
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     if [ "$f" = ".mcp.json" ]; then MCP_TEMPLATE_CHANGED=true; break; fi
 done
-[ "$MCP_TEMPLATE_CHANGED" = "true" ] && echo "  .mcp.json изменён — будет проверена миграция."
 
 # === Step 6c: Migrate workspace .mcp.json to Gateway ===
 # Strategy: migrate in-place first (preserving user servers), then fallback to template copy.
