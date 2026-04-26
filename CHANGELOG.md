@@ -5,6 +5,38 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.28.10] — 2026-04-26
+
+### Fixed (pilot feedback Евгений — UX-trap двух валидаторов на свежей 0.28.8)
+
+- **`setup/validate-template.sh` теперь имеет два режима — `--mode=pristine` (default) и `--mode=installed`.** Pristine = текущее поведение (CI, author template-sync, fresh clone до setup) — все 7 проверок. Installed = пропускает чеки 2 (`/Users/`), 3 (`/opt/homebrew`), 4 (MEMORY ≤15 строк), которые легитимно нарушаются после `setup.sh` подстановкой плейсхолдеров. Универсальные чеки 1, 5, 6, 7 запускаются в обоих режимах. Дефолт = pristine, поэтому CI-вызов `bash setup/validate-template.sh "$PWD"` работает без изменений.
+- **Guard на post-setup state.** Если запущен в pristine-режиме, но детектор находит, что `/Users/andrey_akatov` в `CLAUDE.md` уже подставлен — скрипт печатает подсказку («используйте `setup.sh --validate` или `--mode=installed` или `/audit-installation`») и завершается с exit 0. Без guard'а пользователь после `setup.sh --core` получал FAIL чека 2 и не понимал, что делать.
+- **`setup.sh --validate` теперь делегирует структурные инварианты валидатору шаблона.** Добавлен шаг `[5/5] Структурные инварианты` — вызов `bash setup/validate-template.sh --mode=installed "$SCRIPT_DIR"`. Делегация снимает дублирование чеков (required files, hooks cross-ref) и даёт пользователю единый ответ «установка ОК» или «вот что не так» без необходимости запускать два валидатора.
+
+### Why
+Евгений (пилот, 0.28.8 fresh install): «после `setup.sh --core` команда `setup.sh --validate` зелёная, но `setup/validate-template.sh` становится красной, потому что setup подставляет `/Users` paths прямо в template repo и оставляет FMT dirty». Корень проблемы: один скрипт обслуживал два разных use-case (validate pristine source vs. validate installed workspace) с одной семантикой → пост-инсталляционный пользователь натыкался на FAIL легитимных подстановок. Системный фикс — декомпозиция по режимам + guard как safety net (см. WP-5 #16, deep-check разбор `F + A` варианта).
+
+## [0.28.9] — 2026-04-26
+
+### Changed (validator hardening — `validate-template.sh` rule 6/6)
+
+- **Третий паттерн в правиле 6/6 — `bash (~|$HOME)/IWE/scripts/`.** Раньше валидатор ловил только `FMT-exocortex-template/scripts` и `FMT-exocortex-template/roles/[a-z]*/scripts`. Bare-invocations типа `bash IWE/scripts/iwe-drift.sh` (без fallback на `$IWE_SCRIPTS`) проходили валидацию, но падали в user-mode с `command not found`. Новый паттерн ловит bare-bash-вызовы с тильдой или `$HOME`. False positives отсутствуют — паттерн `${IWE_SCRIPTS:-$HOME/IWE/scripts}` не матчится (после `bash ` идёт `${`, не тильда/`$HOME`).
+- **Enumerate-all вместо first-fail.** Раньше при FAIL'е выводилось `head -3` нарушений ОДНОГО паттерна, остальные паттерны проверялись, но их вывод тоже обрезался. Теперь все hits аккумулируются в `$CHECK6_HITS` и выводятся списком в конце с разделителями `--- Pattern: $pattern ---`. Один FAIL = полный список нарушений → одна правка → один sync.
+
+### Why
+Инцидент 26 апр: `template-sync` 4 раза подряд пушил `audit-installation/SKILL.md` (commits `56ceabd`, `faa1d6e`, `066d866`, `7744b7b`), потому что итеративная правка fallback-цепочки в одном файле триггерила sync на каждом сохранении. Хотя root cause был в стиле редактирования, а не в валидаторе, правило 6/6 не покрывало bare-invocations класса `bash IWE/scripts/X.sh`. Расширение паттерна предотвращает регрессии того же класса в будущих скиллах. Параллельно отрефакторен авторский `month-close/SKILL.md` (3 строки 51/97/115) — `bash IWE/scripts/iwe-drift.sh` → `bash ${IWE_SCRIPTS:-$HOME/IWE/scripts}/iwe-drift.sh`. Скилл локальный (не в `FMT/.claude/skills/`), поэтому в этот релиз не входит.
+
+## [0.28.8] — 2026-04-26
+
+### Fixed (pilot feedback Дмитрий — `/audit-installation` UX)
+
+- **`scripts/iwe-audit.sh` — ложная рекомендация про `scripts/update.sh`.** Старая логика для user-mode требовала `update.sh` в `workspace/scripts/`. Но `update.sh` физически живёт ТОЛЬКО в `FMT-exocortex-template/update.sh` (он сам резолвит `WORKSPACE_DIR=parent of SCRIPT_DIR`), `Step 6` пропагирует в workspace только `.claude/{skills,hooks,rules,...}`, не `scripts/*`. Аналогично `iwe-drift.sh` для user-mode живёт только в FMT-template/scripts/. Фикс: inventory check ищет `update.sh` в `FMT-exocortex-template/`, `iwe-drift.sh` с fallback FMT→workspace. DRIFT_SCRIPT execution тоже фоллбэчит на FMT-template для user-mode.
+- **`audit-installation/SKILL.md` — отчёт писался только в терминал.** Шаг 5 теперь сохраняет полный отчёт + verdict в `$AUDIT_LOG_DIR/iwe-audit-YYYYMMDD-HHMMSS.log`. Логика выбора пути: `$HOME/IWE/scripts/` (author-mode) → `$IWE_SCRIPTS` (user-mode из `~/.iwe-paths`) → `$HOME/IWE` (final fallback). `mkdir -p` гарантирует наличие директории.
+- **`audit-installation/SKILL.md` Шаг 1 — отсутствие fallback при поиске `iwe-audit.sh`.** Прежняя инструкция предписывала `bash $HOME/IWE/scripts/iwe-audit.sh` — для пилота в user-mode (особенно в Docker без `~/.zshenv`, где `$IWE_SCRIPTS` не экспортируется автоматически) скрипт не находился. Добавлена fallback-цепочка `workspace/scripts/` → `$IWE_SCRIPTS` → понятная ошибка с инструкцией `source ~/.iwe-paths` или запустить `setup.sh`.
+
+### Why
+Пилот в Docker на VPS прогнал `/audit-installation`. Получил ложный ❌ про отсутствие `scripts/update.sh` (которого by design не должно быть в workspace), не нашёл лог-файла отчёта, и потенциально упёрся бы в Шаг 1 без `$IWE_SCRIPTS` в env. Урок про placeholder discipline в шаблонных файлах захвачен в memory: при правке файлов в author-mode IWE — только `$IWE_SCRIPTS`/`$IWE_TEMPLATE`/`$HOME`, не хардкод `FMT-exocortex-template/scripts` (валидатор шаблона роняет sync на чеке 6/6).
+
 ## [0.28.7] — 2026-04-26
 
 ### Fixed (sub-agent deep audit, 2 ❌ в migrate-initial-marker.sh)
