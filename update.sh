@@ -345,6 +345,8 @@ if [ -f "$ENV_FILE" ]; then
                     -e "s|{{TIMEZONE_HOUR}}|${ENV_TIMEZONE_HOUR:-}|g" \
                     -e "s|{{TIMEZONE_DESC}}|${ENV_TIMEZONE_DESC:-}|g" \
                     -e "s|{{HOME_DIR}}|${ENV_HOME_DIR:-$HOME}|g" \
+                    -e "s|{{GOVERNANCE_REPO}}|${ENV_GOVERNANCE_REPO:-DS-strategy}|g" \
+                    -e "s|{{IWE_TEMPLATE}}|${ENV_IWE_TEMPLATE:-$SCRIPT_DIR}|g" \
                     "$filepath"
                 PLACEHOLDER_HIT=$((PLACEHOLDER_HIT + 1))
             fi
@@ -359,6 +361,35 @@ if [ -f "$ENV_FILE" ]; then
         # === Preserve secrets: L4_BACKEND, L4_DATABASE_URL ===
         # These are NOT substituted into template files.
         # If they exist in .exocortex.env, they must NOT be overwritten by update.sh.
+
+        # === Auto-add GOVERNANCE_REPO + IWE_TEMPLATE to legacy .exocortex.env (0.28.5+) ===
+        # Если .exocortex.env создан до 0.28.5 — этих ключей нет; дописать.
+        if ! grep -q '^GOVERNANCE_REPO=' "$ENV_FILE" 2>/dev/null; then
+            # Resolve workspace: ENV_WORKSPACE_DIR (если есть) → fallback dirname $SCRIPT_DIR
+            DETECT_WS="${ENV_WORKSPACE_DIR:-$(dirname "$SCRIPT_DIR")}"
+            DETECTED_GOV=""
+            if [ -d "${DETECT_WS}/DS-strategy" ]; then
+                DETECTED_GOV="DS-strategy"
+            else
+                for d in "${DETECT_WS}"/DS-*; do
+                    case "${d##*/}" in
+                        DS-*strategy*) DETECTED_GOV="${d##*/}"; break ;;
+                    esac
+                done
+            fi
+            if [ -z "$DETECTED_GOV" ]; then
+                DETECTED_GOV="DS-strategy"
+                echo "  ⚠ Governance repo не найден в $DETECT_WS — fallback DS-strategy. Проверьте .exocortex.env вручную."
+            fi
+            echo "GOVERNANCE_REPO=$DETECTED_GOV" >> "$ENV_FILE"
+            echo "  ✓ Добавлено GOVERNANCE_REPO=$DETECTED_GOV в .exocortex.env (миграция 0.28.5)"
+            ENV_GOVERNANCE_REPO="$DETECTED_GOV"
+        fi
+        if ! grep -q '^IWE_TEMPLATE=' "$ENV_FILE" 2>/dev/null; then
+            echo "IWE_TEMPLATE=$SCRIPT_DIR" >> "$ENV_FILE"
+            echo "  ✓ Добавлено IWE_TEMPLATE=$SCRIPT_DIR в .exocortex.env (миграция 0.28.5)"
+            ENV_IWE_TEMPLATE="$SCRIPT_DIR"
+        fi
 
         # === Migrate ~/.iwe-env if present (Ф8 migration scenario) ===
         IWE_ENV_GLOBAL="$HOME/.iwe-env"
@@ -500,9 +531,10 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
     echo "  ✓ memory/MEMORY.md — не тронут"
 fi
 
-# Propagate skills, hooks, rules to workspace if changed
+# Propagate skills, hooks, rules, lib, config, detectors to workspace if changed.
+# lib/config/detectors — runtime dependencies капчер-шины (capture-bus.sh) и детекторов.
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-    case "$f" in .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/settings.json)
+    case "$f" in .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/settings.json)
         src="$SCRIPT_DIR/$f"
         dst="$WORKSPACE_DIR/$f"
         mkdir -p "$(dirname "$dst")"
@@ -665,6 +697,24 @@ if ! git diff --quiet 2>/dev/null || [ -n "$(git ls-files --others --exclude-sta
     echo "  ✓ Изменения закоммичены"
 else
     echo "  Нет изменений для коммита"
+fi
+
+# === Step 7.5: Migration hint — initial-marker для old clones (0.28.5+) ===
+# Если у пользователя есть Strategy.md без маркера IWE-INITIAL-NEEDED — намекнуть.
+# Это для пользователей, склонировавших до 0.28.5 (skeleton-marker появился в 0.28.5).
+ENV_FILE="$SCRIPT_DIR/.exocortex.env"
+if [ -f "$ENV_FILE" ]; then
+    ENV_WS=$(grep -E '^WORKSPACE_DIR=' "$ENV_FILE" | head -1 | cut -d= -f2-)
+    ENV_GOV=$(grep -E '^GOVERNANCE_REPO=' "$ENV_FILE" | head -1 | cut -d= -f2-)
+    USER_STRATEGY="${ENV_WS:-}/${ENV_GOV:-DS-strategy}/docs/Strategy.md"
+    if [ -f "$USER_STRATEGY" ] && ! grep -qF 'IWE-INITIAL-NEEDED' "$USER_STRATEGY"; then
+        if grep -qE '^created: YYYY-MM-DD$|^updated: YYYY-MM-DD$' "$USER_STRATEGY" 2>/dev/null; then
+            echo ""
+            echo "⚠ Strategy.md выглядит как seed-скелет, но без маркера IWE-INITIAL-NEEDED (0.28.5+)."
+            echo "  Чтобы /strategy-session корректно ушёл в initial flow, добавьте маркер:"
+            echo "    bash $SCRIPT_DIR/scripts/migrate-initial-marker.sh"
+        fi
+    fi
 fi
 
 # === Done ===

@@ -8,7 +8,6 @@
 INPUT=$(cat)
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 PROJECT_DIR="${CWD:-$(pwd)}"
-# shellcheck disable=SC2034 # CHECKPOINT_FILE документирует путь для агента (используется в additionalContext ниже)
 CHECKPOINT_FILE="$PROJECT_DIR/.claude/checkpoint.md"
 
 # Напоминание агенту — сохранить контекст перед компрессией

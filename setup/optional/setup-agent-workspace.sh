@@ -68,7 +68,6 @@ echo ""
 echo "→ Создаю репозиторий..."
 
 # Определяем GitHub username
-# shellcheck disable=SC2034  # GH_USER reserved для будущего использования (gh команды ниже)
 GH_USER=$(gh api user -q '.login')
 
 cd "$WORKSPACE"

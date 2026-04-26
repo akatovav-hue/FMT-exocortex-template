@@ -5,6 +5,185 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.28.7] — 2026-04-26
+
+### Fixed (sub-agent deep audit, 2 ❌ в migrate-initial-marker.sh)
+
+- **`scripts/migrate-initial-marker.sh` — broken frontmatter (один `---`).** Раньше при некорректном frontmatter (только открывающий `---` без закрывающего) awk не находил второго `---`, не вставлял маркер, но скрипт выдавал «✓ Маркер добавлен» — false positive. Файл оставался без маркера. Фикс: добавлен `grep -c '^---$'` pre-check; если меньше двух `---` — fallback на вставку в начало (как для случая «нет frontmatter»). Также добавлен sanity check `[ ! -s "$TMP" ]` — защита от silent corruption.
+- **`scripts/migrate-initial-marker.sh` — read-only файл молча перезаписывался.** На macOS `mv "$TMP" "$TARGET"` заменяет read-only target если у owner'а есть write-permission на parent dir. Фикс: ранний exit 1 с понятным сообщением + подсказка `chmod u+w` если `[ ! -w "$TARGET" ]`.
+
+### Why
+Третий sub-agent аудит (deep, adversarial QA) прогнал 10 fuzz-cases против `migrate-initial-marker.sh` 0.28.6. Два cases дали реальные регрессии: (g) broken frontmatter — false positive completion; (i) read-only file — silent overwrite. Оба зафиксились ровно той же эвристикой что должна работать в edge cases.
+
+## [0.28.6] — 2026-04-26
+
+### Fixed (red-team Евгения round 2: 1 release-blocker + 2 edge-cases)
+
+- **C1 — `.github/workflows/validate-template.yml`** — release-blocker: CI был red на 7fbee95, потому что inline blacklist в CI расходился с локальным `setup/validate-template.sh` (CI добавил `roles/` в PROTOCOL_PATHS и ловил conditional refs `DS-agent-workspace/scheduler` в `roles/strategist/prompts/{session-prep,note-review}.md`). Теперь CI делегирует author-specific / hardcoded-paths / MEMORY-skeleton / required-files / hooks-cross-ref в `bash setup/validate-template.sh "$PWD"` (source-of-truth). CI-only остаются: smoke-test протокольных хуков, MCP doc check, placeholders check, shellcheck, release-sync.
+- **C2 — `setup/validate-template.sh`** — default аргумент изменён с `$HOME/IWE/FMT-exocortex-template` (author-specific) на `dirname $0/..` (parent dir самого скрипта). Теперь `bash setup/validate-template.sh` (без аргумента) работает на любом checkout — CI, fresh clone, не-author-инсталляция.
+- **C3 — `scripts/migrate-initial-marker.sh` (новый) + `update.sh`** — для пользователей со старым clone (до 0.28.5): их `Strategy.md` создан seed'ом, но без маркера `IWE-INITIAL-NEEDED`. После update до 0.28.5 skill `/strategy-session` уходит в weekly mode даже для day-0 пользователя. Скрипт-мигратор: эвристически распознаёт seed-скелет (placeholder `YYYY-MM-DD` в frontmatter), безопасно вставляет маркер после frontmatter, idempotent (повторный запуск ничего не делает). `update.sh` показывает hint при обнаружении такой ситуации, авто-миграцию НЕ запускает (риск изменить пользовательский файл без согласия).
+
+### Why
+Round 2 red-team Евгения после 0.28.5: runtime blockers закрыты, но release-blocker — GitHub Actions Validate Template red на 7fbee95. Корень — расхождение source-of-truth между CI inline и локальным валидатором. Симптом: оба валидатора проходят локально, но CI падает на разных правилах. Фикс по принципу single-source-of-truth: один валидатор, два места исполнения (local + CI). Edge-cases C2/C3 закрыты тем же коммитом — мелкие, но ломают UX отдельных сценариев.
+
+## [0.28.5] — 2026-04-26
+
+### Fixed (red-team Евгения, 10 blockers B1-B10)
+
+- **B1 — `update-manifest.json`** — добавлены 4 группы файлов, которые попали в FMT через коммиты, но не доставлялись через `update.sh`: `.claude/skills/audit-installation/SKILL.md`, `scripts/iwe-audit.sh`, `docs/migrations/strategy-v0.27.0.md`, `templates/strategy-skeleton/**`. Manifest перегенерирован через `generate-manifest.sh` после bump версии.
+- **B2 — `setup.sh` + `update.sh`** — substitution map расширен с 7 до 9 placeholder'ов: добавлены `DS-strategy` и `/Users/andrey_akatov/IWE/FMT-exocortex-template`. Раньше эти placeholder'ы оставались литералами в `.claude/skills/strategy-session/SKILL.md` после `setup.sh` / `update.sh`. Auto-detection `GOVERNANCE_REPO` перенесён ВЫШЕ блока substitution. Legacy `.exocortex.env` без этих ключей мигрируются автоматически в `update.sh`.
+- **B3 — `.claude/skills/strategy-session/SKILL.md` + `seed/strategy/docs/Strategy.md`** — initial flow раньше включался только при отсутствии `Strategy.md`, но `seed/strategy/` его создавал → fresh setup всегда уходил в weekly. Введён skeleton-marker `<!-- IWE-INITIAL-NEEDED -->` в seed-файле; skill переключается в initial при наличии маркера ИЛИ явного intent пользователя («первая», «c нуля»). §2.5 добавлен шаг удаления маркера после initial-сессии.
+- **B4 — `roles/strategist/prompts/strategy-session.md` + `strategy-session-weekly.md`** — старый weekly prompt переименован в `strategy-session-weekly.md`; новый `strategy-session.md` — тонкий dispatcher, делегирующий в `.claude/skills/strategy-session/SKILL.md`. `strategist.sh strategy-session` (headless и интерактивный) теперь идёт через тот же skill, что и slash-команда.
+- **B5 — `.claude/skills/{day-close,week-close,run-protocol}/SKILL.md`** — skills делегировали в несуществующие секции `memory/protocol-close.md § День / § Неделя`. Day Close расширен до полного алгоритма (201 строка, 12 шагов, чеклист 22 пункта). Week Close — самостоятельный алгоритм (11 шагов, чеклист 11 пунктов). Run-protocol таблица обновлена: маршрутизация = protocol-close.md (краткая), полный алгоритм = SKILL.md соответствующего skill.
+- **B6 — `.claude/hooks/protocol-artifact-validate.sh:56`** — `"Наработки Scout"` убран из mandatory `SECTIONS[]`. Раньше отсутствие секции блокировало DayPlan; теперь Scout проверяется отдельным conditional блоком (только если секция реально присутствует в файле).
+- **B7 — `roles/strategist/prompts/{note-review,session-prep}.md`** — feedback-triage QA-отчёт стал conditional через `[ ! -d "$WORKSPACE/DS-agent-workspace" ]`. Раньше требование было unconditional → fresh user без `DS-agent-workspace` не мог запустить session-prep.
+- **B8 — `roles/synchronizer/scripts/dt-collect.sh:233`** — `collect_sessions()` использовал hardcoded `$WORKSPACE/DS-strategy/inbox/open-sessions.log`, минуя `$GOVERNANCE_DIR`. Параметризовано (post-0.28.4 фикс не покрыл эту строку, хотя CHANGELOG утверждал обратное).
+- **B9 — `.githooks/pre-commit`** — блок template validation перенесён ВЫШЕ `[ -z "$STAGED_SH" ] && exit 0`. Раньше commit с staged только `.md/.yaml/.json` пропускал валидацию шаблона → leak'и author-specific литералов проходили в FMT (`cb22aaa` regression).
+- **B10 — `.claude/skills/audit-installation/SKILL.md` + `scripts/iwe-audit.sh` + `scripts/iwe-drift.sh`** — три фикса: (a) audit skill ищет `iwe-audit.sh` через `$IWE_SCRIPTS` (canonical) с fallback на legacy путь; (b) `iwe-audit.sh` ищет `iwe-drift.sh` в трёх кандидатах ($IWE_TEMPLATE, $IWE_ROOT/scripts, $IWE_ROOT/FMT-.../scripts); (c) `iwe-drift.sh` парсит ТОЛЬКО секцию `pairs:` манифеста (раньше `activity_checks` секция засоряла отчёт пустыми pair-rows); (d) `check: script:*` теперь реально вызывает helper-скрипт (раньше декларации были, исполнения не было).
+
+### Why
+3 системных провала за 0.28.4 → 0.28.5 (red-team Евгения):
+1. **Author-blind testing** — fresh user setup не прогонялся; B1, B2, B3, B7 ловятся одним прогоном `setup.sh` на чистой машине.
+2. **Manifest drift** — `update-manifest.json` обновляется вручную; `generate-manifest.sh` есть, но не вызывается ни pre-commit, ни CI → B1.
+3. **Changelog ≠ verification** — claims в CHANGELOG не сверяются с кодом → B8 (post-0.28.4 changelog утверждал параметризацию, которой не было).
+
+Defer (на отдельный РП): автоматический `generate-manifest.sh` в pre-commit; changelog↔code drift detector.
+
+## [0.28.4] — 2026-04-26
+
+### Fixed
+- **`.claude/skills/week-close/SKILL.md`** — `/Users/andrey_akatov/IWE/scripts/{backup-icloud,check-dirty-repos}.sh` → `${IWE_SCRIPTS}/...`. Прежний путь — место, куда `setup.sh` ничего не клал; скрипты лежат в `FMT-exocortex-template/scripts/`, доступны через `$IWE_SCRIPTS` env-var (генерируется `setup.sh:530`, WP-219). На свежем install Week Close падал на «file not found».
+- **`update.sh`** — case-фильтр пропагации в workspace расширен с `.claude/{skills,hooks,rules,settings.json}` до включения `.claude/{lib,config,detectors}/*`. Hook `capture-bus.sh` source-ит `lib/log_formatter.sh` и `config/capture-detectors.sh` — без них падает с «file not found». `setup.sh` уже был исправлен в `cea51e8`; этот коммит закрывает симметричный пробел в `update.sh`.
+
+### Added
+- **`.claude/skills/strategy-session/SKILL.md`** — skill-обёртка-диспетчер. Detect наличия `Strategy.md` / `WeekPlan` в governance-репо → initial flow (4 шага: цели → неудовлетворённости → первый WeekPlan → MEMORY.md) либо weekly flow (delegate в `roles/strategist/prompts/strategy-session.md`). Закрывает несоответствие между обещанием QUICK-START / README («Проведём первую стратегическую сессию») и runtime, где был только weekly prompt с предусловием draft WeekPlan от session-prep.
+
+### Why
+После native reset на чистый upstream/main найдены три воспроизводимых пробела, которые ломают свежий `setup.sh` или вводят пользователя в заблуждение. Все три — раздельные регрессии сходящихся путей: (1) промоция scripts/ из workspace в FMT не сопровождалась обновлением SKILL.md; (2) расширение списка `.claude/*` подкаталогов в `setup.sh` не было синхронно перенесено в `update.sh`; (3) initial-режим стратегической сессии присутствует только в документации, без runtime-обвязки.
+
+## [0.28.3] — 2026-04-25
+
+### Added
+- **`.claude/hooks/capture-bus.sh`** — диспетчер capture-механизма (DP.SC.025). Запускает enabled-детекторы последовательно на PostToolUse / Stop, передаёт stdout детектора в writer. Никогда не блокирует (exit 0 всегда). Latency-warn при >150ms.
+- **`.claude/lib/capture_writer.sh`** — writer событий: routing event_type → target_path, append в markdown/jsonl. **Параметризован** (Ф9a WP-217): `agent_incident` пишется в target_repo детектора по умолчанию (`<repo>/inbox/incident-log-YYYY-MM.md`, HD «Лог рядом с исполнителем» DP.D.049); override через опциональный `.claude/capture-config.sh` (`INCIDENT_TARGET_REPO`, `INCIDENT_REL_DIR`).
+- **`.claude/lib/log_formatter.sh`, `.claude/lib/resolve_target_repo.sh`** — зависимости writer'а.
+- **`.claude/lib/capture_selftest.sh`** — sanity-check для capture-bus.
+- **`.claude/lib/behaviour-report.sh`** — агрегатор incident-log за период (для R-вопросника Week Close: алгоритм агента «(1) запустить behaviour-report, (2) прочитать incident-log, (3) предъявить паттерны»).
+- **`.claude/config/capture-detectors.sh`** — реестр детекторов (pipe-separated). 3 активных: `incident`, `decision`, `pattern_awareness`. `permission_request` закомментирован — fail by architecture (30.7% fire / p50=1023ms на обкатке 10-25 апр), заменяется harness-гейтом `p5-stop-reminder.sh` (S-29 testing).
+- **`.claude/detectors/detector_incident.sh`** — ловит P3_structure_without_map (Write нового .md в корень репо без проверки routing-карты).
+- **`.claude/detectors/detector_decision.sh`** — ловит решения пользователя по 5 event_type (для DP.M.* decision register).
+- **`.claude/detectors/detector_pattern_awareness.sh`** — ловит P1 (write в feedback_*.md).
+- **`.claude/detectors/README.md`** — контракт интерфейса детектора (input JSON, output JSON или пусто, exit 0 всегда).
+- **`.claude/capture-config.sh.example`** — шаблон override-конфигурации.
+- **`.claude/settings.json`** — регистрация `capture-bus.sh` для PostToolUse(Edit|Write|MultiEdit) и Stop.
+
+### Changed
+- WP-217 Ф9a: `capture_writer.sh` `agent_incident` routing убрал hardcoded путь к авторскому governance-репо. Generic-поведение для пилотов: инциденты пишутся рядом с исполнителем; авторская агрегация — через локальный override-файл вне FMT-обновлений.
+
+## [0.28.2] — 2026-04-25
+
+### Added
+- **`memory/t-checklist.md`** — реестр T-действий ТО IWE: 22 действия в Session/Day/Week/Month Close, owner/trigger/symptom-if-skipped для каждого. Класс T (True maintenance, идемпотентно, автопилот). Verification — Haiku R23 (формальная проверка чеклиста). Источник: WP-217 Ф3 (промотировано из staging S-31, обкатка 14 дней).
+- **`memory/r-questionnaire.md`** — R-вопросник Week/Month Close: 3 недельных + 6 месячных вопросов для переосмысления (не yes/no, экзоскелетный режим — агент даёт факты, человек судит). Класс R (Review/judgment). Включает M6 decommission-триаж (active → dormant → archived).
+- **`.claude/sync-manifest.yaml`** — реестр пар «источник → производное» для `iwe-drift.sh`. Шаблон с 3 generic-парами (protocols-to-skills, protocol-open-to-day-open-skill, staging-validated-to-fmt) + закомментированные шаблоны для Pack↔DS, root-CLAUDE↔instrument, instrument-docs↔code. Секция `activity_checks:` для decommission-триажа в Month Close.
+- **`scripts/iwe-drift.sh`** — R23-детектор drift'а пар (mtime-lag, без LLM). MVP-версия: shell + git + stat + awk, без внешних зависимостей. Usage: `bash scripts/iwe-drift.sh [--critical|--top N|--manifest PATH]`. Markdown-вывод для прямой вставки в DayPlan/Week Report.
+
+### Changed
+- Регламент техобслуживания IWE (элемент #15 культуры работы) теперь промотирован в шаблон: пользователи получают T-checklist, R-вопросник, drift-механизм при `update.sh`. Класс T/S/R закреплён в `.claude/rules/distinctions.md` HD «ТО ≠ Sync ≠ Review».
+
+## [0.28.1] — 2026-04-25
+
+### Changed
+- **`memory/hard-distinctions.md`** — переписан: 631 → 374 строки (40% сокращение). 23 различения в порядке релевантности (Персона/Скрипт-Агент/MCP-имена/Лог-Инцидент сверху). 15 различений → `hard-distinctions_archive.md` (исторически важные, не используются в текущей работе >1 мес). 8 удалены полностью (тривиальные дубли slim distinctions.md). Для пилотов: новая компактная нумерация 1-23, прежние ссылки на номера >27 устаревают.
+- **`memory/navigation.md`** — удалена авторская таблица MCP-исходников (`DS-MCP/knowledge-mcp/...`) и ссылка на authored MCP-search. Эти пути относятся к авторскому workspace, не к шаблону.
+- **`memory/checklists.md`** — удалён давний урок про stale knowledge-mcp (фев 2026, не релевантен пилотам).
+- **`memory/protocol-open.md`, `memory/repo-type-rules.md`, `roles/strategist/scripts/cleanup-processed-notes.py`** — placeholder-sub: `DS-my-strategy` → `DS-strategy` (унификация с FMT-конвенцией).
+- **`CLAUDE.md`** — удалена строка «Бот = интерфейс / engines/tailor» в `### Различения (авторские)` §9 (специфика автора, не шаблон).
+
+### Fixed
+- **`template-sync.sh` strip-list расширен** (DS-ai-systems источник): `DS-MCP`, `knowledge-mcp`, `gateway-mcp`, `digital-twin`, `content-pipeline`, `engines/tailor` теперь вычищаются. Sync был застрял в FAILED state с ~21 апр (validation abort на этих паттернах в hard-distinctions.md HD #27 + #29). Теперь sync проходит validation.
+
+## [0.28.0] — 2026-04-25
+
+### Changed
+- **`.claude/settings.json`** — `defaultMode` изменён с `"dontAsk"` на `"acceptEdits"`. Это исправление: `dontAsk` означает «по умолчанию **запрещать** инструменты вне allow-листа», что приводило к скрытым отказам и порождало повторные permission-запросы у пользователей. `acceptEdits` авто-аппрувит файловые операции (`Edit`/`Write`, `cp`/`mv`/`mkdir`/`touch`/`rm`/`rmdir`/`sed`) в рабочих директориях; deny-rules (`Bash(sudo *)`, `Bash(rm -rf *)`) остаются в силе. Для пользователей: меньше ненужных диалогов согласования, особенно при `update.sh`.
+- **`memory/hard-distinctions.md` HD #27** переписан: «Бот ≠ Платформа; Neon + DT MCP = один ЦД» → «Персона ≠ Память ≠ Контекст». Новая модель пользовательских данных (DP.D.052, WP-257) с критерием разделения «writer + owner»: Персона = Git пользователя, Память = Neon платформы, Контекст = runtime LLM-вызова. Маппинг старого «ЦД» на новые слои + 5 категорий вне пользовательской модели + расщепление Памяти на Observed/Derived. SoTA: Letta, Mem0, LangMem, Anthropic Memory tool.
+- **`memory/checklists.md`** — урок «MCP-индекс может вернуть stale» переформулирован с конкретной датой/документом.
+- **`memory/protocol-open.md`, `memory/repo-type-rules.md`, `memory/navigation.md`** — мелкие уточнения формулировок.
+
+### Fixed
+- **`roles/strategist/prompts/note-review.md`, `session-prep.md`, `cleanup-processed-notes.py`** — точечные правки.
+- **`roles/synchronizer/scripts/dt-collect.sh`** — упрощение (≈36 строк диффа).
+
+### Meta
+- **Drift CHANGELOG ↔ update-manifest.json** (5 версий 0.27.3-0.27.7 не имели bump манифеста, `update.sh --check` возвращал 0.26.1 как «актуальную»). Bump манифеста до 0.28.0 закрывает разрыв за один шаг. Системный фикс (pre-commit hook, не дающий закоммитить CHANGELOG без bump'а manifest) — отдельный РП, S-30 в STAGING.
+
+## [0.27.7] — 2026-04-24
+
+### Fixed
+- **`roles/extractor/scripts/extractor.sh` + `roles/extractor/prompts/inbox-check.md`** (WP-7 Ф-1) — подсчёт pending captures и дефиниция в промпте. Старая логика `grep -c '\[analyzed'` ловила substring в описаниях/цитатах captures.md (например, в тексте капчи мог быть `[analyzed` как часть описания), не только реальные маркеры-статусы. На реальном файле: 166 заголовков, substring-match ≠ реальному счёту маркеров. Формула `PENDING - PROCESSED - ANALYZED` давала ложные числа → каждые 3 часа LLM запускался «на 80 pending» и отвечал «all marked». Fix: прямой подсчёт заголовков БЕЗ любого из 4 маркеров на той же строке (`grep -E '^### ' | grep -vE '\[(analyzed|processed|duplicate|defer)\b'`). Regex `\b` (word boundary) ловит датированные маркеры типа `[analyzed 2026-04-10]`, которые `\]` пропускал. Промпт обновлён на все 4 маркера. Sync from DS-ai-systems 437048b.
+
+## [0.27.6] — 2026-04-24
+
+### Fixed
+- **`roles/synchronizer/scripts/daily-report.sh`** (WP-7 I2) — `mv SchedulerReport → archive/` падал при отсутствующем `archive/`. Под `set -euo pipefail` это прерывало скрипт с non-zero exit → `scheduler.sh` логировал `WARN: daily-report failed` каждые 3 часа. Добавлен `mkdir -p "$ARCHIVE_DIR"` в `archive_old_reports()`.
+- **`roles/strategist/scripts/strategist.sh`** (WP-7 I1) — `BOLD_BEFORE=$(grep -c ... || echo 0)` при exit 1 от grep (0 matches) давал мультистрочный `"0\n0"` → `$(( BOLD_BEFORE - BOLD_NEW_BEFORE ))` падал с `line 249: 0: syntax error`, `[ -ge ]` — с `integer expression expected`. Fix: `|| true; VAR=${VAR:-0}` (5 точек: BOLD_BEFORE, BOLD_NEW_BEFORE, BOLD_AFTER, BOLD_NEW_AFTER, NON_BOLD).
+- **Тот же антипаттерн `grep -c ... || echo N)` в 11 точках 7 файлов** (субагент-ревью после I1+I2): `setup/validate-template.sh`, `.claude/hooks/protocol-artifact-validate.sh`, `roles/synchronizer/scripts/templates/{synchronizer,extractor}.sh`, `update.sh` (3 точки: DIFF_COUNT, CONFLICT_COUNT, WS_CONFLICTS), `.github/workflows/{cloud-scheduler,validate-template}.yml`. Все использовались в `[ -gt N ]` / арифметике → потенциальные баги того же класса.
+
+Commits: 150be24 (I1+I2 sync из DS-ai-systems), 731471f (I3 sweep 11 точек).
+
+## [0.27.5] — 2026-04-24
+
+### Changed
+- **`roles/strategist/scripts/strategist.sh` переименован концептуально (не файл):** context-файл зонтичного WP-7 в авторском governance-репо переехал `archive/wp-contexts/WP-7-bot-tech-debt.md` → `inbox/WP-7-platform-tech-debt.md`. Для шаблона это не blocker (пилоты используют свой `WP-N-*.md`), но в документации `PROCESSES.md` бота обновлена ссылка. Причина: WP-7 давно стал зонтом всей платформы (не только бота) + ошибочно жил в archive/, хотя active (`umbrella: true`). Подтверждено субагентом.
+
+## [0.27.4] — 2026-04-24
+
+### Fixed
+- **`roles/synchronizer/scripts/dt-collect.sh`** помечен как author-only (header + raison d'être). Скрипт пишет напрямую в production-БД Neon платформы через `NEON_URL` / `DT_USER_ID`, и эти секреты есть только у автора шаблона. Конечным пользователям IWE не нужно создавать `~/.config/aist/env` с этими переменными.
+- **`roles/synchronizer/scripts/scheduler.sh`** добавлен guard: `dt-collect.sh` молча пропускается, если `~/.config/aist/env` не содержит `NEON_URL`+`DT_USER_ID`. У пользователей без секретов автора скрипт не запускается, ошибок не возникает, скачанный код остаётся как маркер будущей фичи.
+- **`roles/synchronizer/README.md`** новая секция «Author-only скрипты» объясняет, почему файл есть в шаблоне, но не запускается у пользователей; даёт ссылку на правильный пользовательский путь (MCP-инструмент `dt_write_digital_twin` в IWE Gateway).
+
+Триггер: пользовательский запрос (boberru@gmail.com 24 апр) — шаблон требовал NEON_URL/DT_USER_ID, что является L3-утечкой секретов автора. Системная замена psycopg2-writer → REST endpoint (`POST /hub/events`) через Activity Hub запланирована фазой P2b в `DP.ROADMAP.001-neon-migration.md` (WP-253), активация после P2 (создание #2 journal, ориентир июнь 2026).
+
+## [0.27.3] — 2026-04-24
+
+### Added
+- **`setup/validate-template.sh` check 7 + `.github/workflows/validate-template.yml` job «Check hooks cross-ref»** (systemic followup к #13). Проверяет cross-ref в обе стороны: (a) FAIL если hook упомянут в `settings.json*`, но файла нет в `.claude/hooks/`; (b) WARN если hook есть в директории, но не упомянут ни в одном settings.json (может быть direct-call, как `wakatime-heartbeat.sh`). Покрывает оба направления drift'а (settings→hooks и hooks→settings). Предотвращает повторение issue #13.
+
+### Fixed
+- **`setup/validate-template.sh` check 2** добавлен `--exclude='CHANGELOG.md'` (зеркально с CI workflow) — CHANGELOG содержит `/Users/...` в описаниях и создавал false-positive.
+
+## [0.27.2] — 2026-04-23
+
+### Fixed
+- **`.claude/hooks/extensions-gate.sh`** (closes #13) — добавлен отсутствующий hook. Ссылка на файл жила в `.claude/settings.json:44` (PreToolUse matcher `Edit|Write`) с 7 апр (коммит `af73cd3`, WP-207), но сам скрипт так и не попал в шаблон — у нового пилота первый же `Write`/`Edit` падал с ошибкой «hook file not found». Хук реализует блокирующий Extensions Gate (CLAUDE.md §9): прямое редактирование `.claude/skills/*.md` или `memory/protocol-*.md` блокируется с подсказкой использовать `extensions/*.md`. Исключения: `author_mode: true` в `params.yaml`, путь `FMT-exocortex-template`. Корневая причина: `setup/validate-template.sh` не проверяет соответствие `settings.json` hooks ↔ содержимое `.claude/hooks/` (проверяет 6 других вещей, но не cross-ref). Попутная находка: `wakatime-heartbeat.sh` есть в hooks/, но не упомянут в settings.json (тот же класс drift'а в обратную сторону). Systemic followup (отдельный WP на W18): расширить validate-template.sh проверкой cross-ref + включить в pre-commit/CI FMT, плюс определить судьбу архивированного `template-sync.sh`.
+
+## [0.27.1] — 2026-04-22
+
+### Changed
+- **Rollback S-27 «Здоровье платформы»** — секция содержала авторские сервисы (`@aist_me_bot`, `digital-twin`, `gateway-mcp`, `content-pipeline`, `knowledge-mcp`), не применимые обычному пользователю FMT. Перенесена в авторские `extensions/day-open.after.md`. Files: `memory/templates-dayplan.md`, `.claude/skills/day-open/SKILL.md`, `.claude/hooks/protocol-artifact-validate.sh` — удалена секция + step 5b «Бот QA»; SECTIONS хука урезан с 11 до 6. Источник: косяк промоции S-27 — тест «применимо пустому пользователю?» (см. авторский `memory/feedback_post_promote_sync.md`).
+- **L3 leak cleanup (параметризация через env-vars):** `.claude/hooks/protocol-artifact-validate.sh`, `scripts/day-close.sh`, `roles/strategist/scripts/cleanup-processed-notes.py`, `roles/synchronizer/scripts/dt-collect.sh`, `roles/strategist/prompts/{note-review,session-prep}.md` — хардкод `DS-my-strategy`, `DS-agent-workspace/scheduler/feedback-triage/`, `~/IWE/DS-my-strategy` заменён на `$IWE_WORKSPACE` + `$IWE_GOVERNANCE_REPO` (fallback: `DS-strategy`) и условные `if настроены агенты-сборщики QA`.
+- **`memory/hard-distinctions.md` HD #49:** примеры MCP-именования обобщены (`digital-twin-mcp`, `knowledge-mcp` → `<domain>-mcp`). `memory/checklists.md`: урок «knowledge-mcp stale index» → «MCP-индекс». `memory/navigation.md`: таблица MCP → placeholder'ы. `CLAUDE.md`: удалено правило `engines/tailor` (авторская реализация бота).
+- **`.claude/skills/ke/SKILL.md`, `memory/{repo-type-rules,protocol-open}.md`:** `DS-my-strategy` → `<governance-repo>` (env).
+
+### Added
+- **CI smoke-test** (`.github/workflows/validate-template.yml`): job «Smoke-test protocol hooks on clean user env» — создаёт tmp-окружение с `DS-strategy` + минимальным DayPlan и прогоняет `protocol-artifact-validate.sh`. Падает, если хук блокирует commit на чистом пользователе. Перехватывает L1→L3 утечки, которые пропускает blacklist.
+- **Расширенный blacklist** (два уровня) в `validate-template.yml` + зеркально в локальном `setup/validate-template.sh`: глобальный (запрещено везде: `tserentserenov`, `PACK-MIM`, `aist_bot_newarchitecture`, `DS-Knowledge-Index-Tseren`, `DS-my-strategy`, `engines/tailor`) и protocol-only (запрещено в `.claude/skills|hooks|rules`, `memory`, `CLAUDE.md`, но разрешено в README/docs: `@aist_me_bot`, `digital-twin`, `content-pipeline`, `knowledge-mcp`, `gateway-mcp`, `DS-agent-workspace/scheduler`). Покрытие расширено на `roles/`.
+
+### Fixed
+- CI `validate-template.yml` — зеркалирование exclude-логики локального валидатора для путей (`/Users/...`, `/opt/homebrew`) + shellcheck severity: warning→error (0 pred-existing errors, CI зеленеет).
+
+## [0.27.0] — 2026-04-21
+
+### Added
+- **seed/strategy/docs/Strategy.md** — секция «Состояние месяца — фаза стратегической позиции» (PD.FORM.078: 4 фазы Развитие/Хаос/Потолок/Пивот, диагностика по 5 сигналам, playbook, сигналы перехода) + секция «Калибр личности» (PD.CHR.007, gap-analysis по 3 направлениям: горизонт / bus factor / публичность) + строка-источник «НЭП-триады» перед таблицей R1-R{N}. Strategy Session теперь начинается с явной декларации фазы и playbook-а под неё, а не с произвольного выбора РП. Источник: WP-196 Ф12.1, S-26 promoted.
+- **memory/templates-dayplan.md** (WeekPlan) — блоки «Применённые критерии отбора РП» (PD.METHOD.017 + Time-boxing Shape Up: РП без 50% бюджета к четвергу → пересмотр на следующей сессии) + «ТОС недели + запрос недели» на открытии; секция «## Week Close» с 4 подсекциями (сверка РП↔НЭП, рекомендации изменений в НЭП/Стратегию, carry-over, мультипликатор и метрики) на закрытии. Источник: WP-196 Ф12.1, S-26.
+- **memory/templates-dayplan.md** (DayPlan) — секция «Day Close» с 3 подсекциями (три варианта плана на завтра A/B/C, KE-маршрутизация, сверка с НЭП). Day Close теперь имеет видимую структуру весь день, а не появляется «в момент закрытия». Источник: WP-196 Ф12.1, S-26.
+
+### Changed
+- **memory/templates-dayplan.md, .claude/skills/day-open/SKILL.md, .claude/hooks/protocol-artifact-validate.sh** — секция `Здоровье бота (QA)` переименована в `Здоровье платформы` (семантически strict superset: старая секция стала подзаголовком `### Бот @aist_me_bot (QA)`, добавлены `### Остальные MCP-сервисы` + `### Operational health`). Хук валидатора обновлён в lockstep (список секций + awk range + сообщение ошибки). Привязка: WP-255 (L3/L4 AI Quality для всех MCP) draft + HD «Internal health ≠ Public status page». Источник: WP-196 Ф12.3 partial, S-27 promoted.
+
 ## [0.26.4] — 2026-04-18
 
 ### Added
@@ -167,7 +346,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 ### Changed
 - **day-open/SKILL.md v1.1** — carry-over из вчерашнего DayPlan теперь обязательная логика (не конфиг-флаг). Убран `day_close.review_yesterday_close`
 - **day-open/SKILL.md** — алгоритм и шаблоны объединены в один файл. Шаг 2: приоритет входов (carry-over → WeekPlan → mandatory)
-- **day-open/SKILL.md** — `{{GOVERNANCE_REPO}}` вместо prose-текста (формализация)
+- **day-open/SKILL.md** — `DS-strategy` вместо prose-текста (формализация)
 - **day-rhythm-config.yaml** — добавлен `calendar_ids: []` (Day Open запрашивает все календари или указанные)
 - **day-rhythm-config.yaml** — убран `day_close` (carry-over = часть алгоритма, не настройка)
 

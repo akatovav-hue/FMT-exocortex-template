@@ -3,13 +3,12 @@
 
 Выполни сценарий Day Plan для роли Стратег (R1).
 
-Источник сценария: /Users/andrey_akatov/IWE/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/02-day-plan.md
 
 ## Контекст
 
 - **HUB (личные планы):** /Users/andrey_akatov/IWE/DS-strategy/current/
 - **SPOKE (планы репо):** /Users/andrey_akatov/IWE/*/WORKPLAN.md
-- **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
+- **MEMORY:** ~/.claude/projects/-Users-andrey_akatov-IWE/memory/MEMORY.md
 
 ## Именование файлов в current/
 
@@ -84,29 +83,7 @@ git -C /Users/andrey_akatov/IWE/<repo> log --since="yesterday 00:00" --until="to
   - Добавь в таблицу «План на сегодня» колонку «Контекст» со ссылкой на файл
   - В секцию «Рекомендация» включи: текущее состояние из context file, следующий шаг
 
-### 3c. Проверка незалитых коммитов бота (pilot → new-architecture)
-
-> Секция выполняется **только если** задана env var `$BOT_REPO_DIR` (путь к репо бота с двумя ветками). Не задана → пропустить секцию целиком.
-> **ВАЖНО:** Используй `git cherry`, а НЕ `git log A..B`. Cherry-pick создаёт новые SHA — `git log` считает их «отсутствующими», хотя содержимое идентичное. `git cherry` сравнивает по patch-id (содержимому).
-
-```bash
-# Требуется: $BOT_REPO_DIR (из ~/.config/aist/env). Имена веток: BOT_BRANCH_PILOT, BOT_BRANCH_PROD (defaults: pilot, new-architecture)
-[ -n "${BOT_REPO_DIR:-}" ] && [ -d "$BOT_REPO_DIR" ] || exit 0
-BOT_BRANCH_PILOT="${BOT_BRANCH_PILOT:-pilot}"
-BOT_BRANCH_PROD="${BOT_BRANCH_PROD:-new-architecture}"
-# Коммиты на pilot, отсутствующие на prod (+ = реально отсутствует, - = уже cherry-picked)
-git -C "$BOT_REPO_DIR" cherry -v "$BOT_BRANCH_PROD" "$BOT_BRANCH_PILOT" 2>/dev/null | grep '^\+'
-# Коммиты на prod, отсутствующие на pilot (обратное направление)
-git -C "$BOT_REPO_DIR" cherry -v "$BOT_BRANCH_PILOT" "$BOT_BRANCH_PROD" 2>/dev/null | grep '^\+'
-```
-
-- Если есть коммиты с `+` в любом направлении → добавить в DayPlan секцию с ТОЧНЫМ числом:
-  ```
-  **🤖 Бот: рассинхрон веток:** N коммитов на pilot (не на prod), M коммитов на prod (не на pilot). Команда для синхронизации: «мержи на прод».
-  ```
-- Если коммитов с `+` нет или `$BOT_REPO_DIR` не задан → не включать секцию.
-
-> Сценарий merge: PROCESSES.md § 4.2. Merge выполняется ТОЛЬКО по команде пользователя.
+<!-- YOUR CUSTOM CHECKS HERE -->
 
 ### 3b. Inbox Triage (заметки за вчера)
 
@@ -115,7 +92,7 @@ git -C "$BOT_REPO_DIR" cherry -v "$BOT_BRANCH_PILOT" "$BOT_BRANCH_PROD" 2>/dev/n
 
 - Проверь `DS-strategy/inbox/fleeting-notes.md` — есть ли **жирные** заметки
 - Если есть (≥1) — выполни мини-триаж inline:
-  1. Классифицируй каждую жирную заметку по 7 категориям: НЭП / Задача / Знание / Черновик / Идея 🔄 / Личные данные / Шум
+  1. Классифицируй каждую жирную заметку по 7 категориям: НЭП / Задача / Знание доменное / Знание реализационное / Черновик / Личные данные / Шум
   2. Сверь с коммитами за вчера (шаг 1) — что уже сделано? (уже сделано → Шум)
   3. Сформируй секцию `📋 Inbox Triage` со всеми корзинами (включая 📝 если есть зёрна для черновиков)
   4. **НЕ** помечай заметки и **НЕ** архивируй — это делает только Note-Review
@@ -126,10 +103,10 @@ git -C "$BOT_REPO_DIR" cherry -v "$BOT_BRANCH_PILOT" "$BOT_BRANCH_PROD" 2>/dev/n
 
 На основании **итогов вчера** + **обновлённого плана недели**:
 
-- Выбери 2-4 РП из недельного плана
-- Учти carry-over со вчера (незавершённые задачи — приоритет)
+- **Carry-over из Day Close** (секция «Завтра начать с») → все РП в план без обрезки — это решение пользователя
+- Дополни из недельного плана: 2-4 фокусных РП (≥1h). Carry-over и mandatory не ограничивать
 - Учти дедлайны из WeekPlan и WORKPLAN.md репозиториев
-- Ограничь по дневному бюджету (4-6h)
+- Ограничь фокусные по дневному бюджету (4-6h)
 - Для каждого РП укажи: номер, название, бюджет, приоритет
 
 ### 5. Рекомендация
@@ -178,19 +155,17 @@ agent: Стратег
 
 ---
 
-## 📋 Inbox Triage (DD мес)
+## Разбор заметок (N)
 
 > Источник: Note-Review (вчера) или мини-триаж (Day-Plan).
 > Секция включается ТОЛЬКО если есть заметки для разбора.
+> Неразобранное переносится в следующий DayPlan автоматически.
 
-### ✅ Архив (отработано)
-- ...
-
-### 📌 Предложения в РП
-- ...
-
-### ❓ На решение
-- ...
+| Заметка | Тип | Предложение | ✅ |
+|---------|-----|-------------|---|
+| «текст» | НЭП | → Dissatisfactions.md | [ ] |
+| «текст» | Задача | → WeekPlan | [ ] |
+| «текст» | Черновик | → drafts/X.md (согласовать) | [ ] |
 
 ---
 

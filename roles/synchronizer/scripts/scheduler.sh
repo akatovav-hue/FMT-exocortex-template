@@ -29,11 +29,13 @@ portable_date_offset() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SYNC_DIR="$(dirname "$SCRIPT_DIR")"
 STATE_DIR="$HOME/.local/state/exocortex"
 LOG_DIR="$HOME/logs/synchronizer"
 LOG_FILE="$LOG_DIR/scheduler-$(date +%Y-%m-%d).log"
 
 ROLES_DIR="/Users/andrey_akatov/IWE/FMT-exocortex-template/roles"
+NOTIFY_SH="$SCRIPT_DIR/notify.sh"
 
 # Таймаут на задачи (сек): предотвращает блокировку dispatch зависшей задачей
 TASK_TIMEOUT_SHORT=300    # 5 мин — bash-скрипты (code-scan, dt-collect, reindex)
@@ -238,23 +240,26 @@ dispatch() {
     fi
 
     # --- Синхронизатор: dt-collect (после code-scan) ---
+    # AUTHOR-ONLY: требует NEON_URL + DT_USER_ID в ~/.config/aist/env (секреты автора
+    # шаблона). Пользовательский путь — через event-gateway, фаза в WP-253 роадмапе.
     if ! ran_today "synchronizer-dt-collect"; then
-        log "→ synchronizer dt-collect (hour=$HOUR)"
-        if timeout "$TASK_TIMEOUT_SHORT" "$SCRIPT_DIR/dt-collect.sh" >> "$LOG_FILE" 2>&1; then
-            mark_done "synchronizer-dt-collect"
-        else
-            log "WARN: dt-collect failed (will retry next dispatch)"
+        if [ -f "$HOME/.config/aist/env" ] && grep -qE '^NEON_URL=' "$HOME/.config/aist/env" \
+           && grep -qE '^DT_USER_ID=' "$HOME/.config/aist/env"; then
+            log "→ synchronizer dt-collect (hour=$HOUR)"
+            if timeout "$TASK_TIMEOUT_SHORT" "$SCRIPT_DIR/dt-collect.sh" >> "$LOG_FILE" 2>&1; then
+                mark_done "synchronizer-dt-collect"
+            else
+                log "WARN: dt-collect failed (will retry next dispatch)"
+            fi
+            ran=1
         fi
-        ran=1
+        # Если env отсутствует — молча пропускаем (author-only, у пользователей нет секретов).
     fi
 
     # --- Синхронизатор: daily-report (после code-scan и strategist morning) ---
-    # Зависимость: daily-report ждёт успешное завершение strategist-morning (иначе маркеры
-    # читаются до morning → RED-отчёт даже если morning отработал позже).
-    # Fallback: если morning не прошёл к 9:00, report всё равно создаётся (показывает RED честно).
     if ! ran_today "synchronizer-daily-report"; then
-        if ran_today "strategist-morning" || (( 10#$HOUR >= 9 )); then
-            log "→ synchronizer daily-report (hour=$HOUR, morning=$(ran_today 'strategist-morning' >/dev/null 2>&1 && echo ok || echo pending))"
+        if ran_today "strategist-morning" || (( 10#$HOUR >= 6 )); then
+            log "→ synchronizer daily-report (hour=$HOUR)"
             if timeout "$TASK_TIMEOUT_SHORT" "$SCRIPT_DIR/daily-report.sh" >> "$LOG_FILE" 2>&1; then
                 mark_done "synchronizer-daily-report"
             else
