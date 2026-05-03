@@ -19,14 +19,14 @@ Week Close = протокол. Исполнять ТОЛЬКО пошагово 
 ## Алгоритм
 
 ### 0. Extensions (before)
-Проверить: `ls extensions/week-close.before.md`. Если существует → `Read` → выполнить как первые шаги.
+Загрузить: `bash .claude/scripts/load-extensions.sh week-close before`. Exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить как первые шаги. Exit 1 → пропустить. Поддерживает `extensions/week-close.before.md` И `extensions/week-close.before.<suffix>.md`.
 
 ### 1. Сбор данных за 7 дней
 
 ```bash
-for repo in $(ls /Users/andrey_akatov/IWE/); do
-  if [ -d /Users/andrey_akatov/IWE/$repo/.git ]; then
-    commits=$(git -C /Users/andrey_akatov/IWE/$repo log --since="last monday 00:00" --until="today 00:00" --oneline --no-merges 2>/dev/null)
+for repo in $(ls {{WORKSPACE_DIR}}/); do
+  if [ -d {{WORKSPACE_DIR}}/$repo/.git ]; then
+    commits=$(git -C {{WORKSPACE_DIR}}/$repo log --since="last monday 00:00" --until="today 00:00" --oneline --no-merges 2>/dev/null)
     [ -n "$commits" ] && echo "=== $repo ===" && echo "$commits"
   fi
 done
@@ -36,7 +36,7 @@ done
 
 ### 2. Headless week-review (если включён launchd Пн 00:00)
 
-> **Условный шаг:** если запущен через `strategist.sh week-review` (Пн 00:00 launchd) — алгоритм идёт через `/Users/andrey_akatov/IWE/FMT-exocortex-template/roles/strategist/prompts/week-review.md`. В интерактивном режиме `/week-close` (вечер Вс) — выполнять следующие шаги вручную.
+> **Условный шаг:** если запущен через `strategist.sh week-review` (Пн 00:00 launchd) — алгоритм идёт через `{{IWE_TEMPLATE}}/roles/strategist/prompts/week-review.md`. В интерактивном режиме `/week-close` (вечер Вс) — выполнять следующие шаги вручную.
 
 ### 3. Ретро (closed/partial/not_started/blocked)
 
@@ -83,18 +83,27 @@ ${IWE_SCRIPTS}/check-dirty-repos.sh
 
 Если есть грязные репо → закоммитить и запушить ДО завершения Week Close.
 
+#### 7c. Memory Validate (T22b, WP-217 Ф10.2)
+
+```bash
+bash ${IWE_SCRIPTS}/memory-bleed.sh
+```
+
+**Нарушения** (HOT-лимит, orphans, superseded_by без ссылки) → исправить до коммита Week Close.
+**Кандидаты на понижение горизонта** → информативно, пользователь решает при следующем Month Close.
+
 ### 8. Запись итогов в WeekPlan
 
 Дописать секцию «Итоги W{N}» в текущий WeekPlan (структура — см. `roles/strategist/prompts/week-review.md`).
 
 ### 9. Extensions (after)
 
-Проверить: `ls extensions/week-close.after.md`. Если существует → `Read` → выполнить.
+Загрузить: `bash .claude/scripts/load-extensions.sh week-close after`. Exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/week-close.after.md` И `extensions/week-close.after.<suffix>.md`.
 
 ### 10. Закоммитить governance-репо
 
 ```bash
-cd /Users/andrey_akatov/IWE/DS-strategy && git add -A && git commit -m "week-close: W{N} итоги" && git push
+cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}} && git add -A && git commit -m "week-close: W{N} итоги" && git push
 ```
 
 ### 11. Верификация (Haiku R23)

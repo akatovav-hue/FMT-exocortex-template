@@ -6,7 +6,7 @@ argument-hint: "[--skip-mcp] [--critical]"
 
 # Аудит инсталляции IWE
 
-> **Service Clause:** [VR.SC.005-installation-audit](https://github.com/your-username/PACK-verification/blob/main/pack/verification/08-service-clauses/VR.SC.005-installation-audit.md)
+> **Service Clause:** [VR.SC.005-installation-audit](https://github.com/{{GITHUB_USER}}/PACK-verification/blob/main/pack/verification/08-service-clauses/VR.SC.005-installation-audit.md)
 > **Роль:** VR.R.002 Аудитор (PACK-verification) — субагент с context isolation
 > **Принцип:** детектор отчитывается, оператор делает (см. `scripts/iwe-drift.sh:7-11`). Auto-fix не входит в обещание.
 

@@ -4,7 +4,7 @@
 
 ## Контекст
 
-- Планы: /Users/andrey_akatov/IWE/DS-strategy/current/
+- Планы: {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/
 
 ## Алгоритм
 
