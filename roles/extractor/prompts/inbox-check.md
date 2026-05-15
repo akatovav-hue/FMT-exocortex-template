@@ -60,14 +60,18 @@
 **2c. Формализация (lazy reading):**
 
 1. Прочитай целевую директорию ТОЛЬКО нужного Pack'а → найди существующие файлы → назначь ID
-2. Имя файла: по конвенции из routing.md § 3
-3. Создай содержимое по шаблону (шаблоны — в `prompts/session-close.md`, шаг 4d)
+2. **Pending-id check (NEW 2026-05-15):** прежде чем зафиксировать ID — grep по всем pending-review отчётам в `{{GOVERNANCE_REPO}}/inbox/extraction-reports/*.md`. Если предлагаемый ID уже claimed другим pending отчётом (через `applied_as:` или `target_path:`) — взять next free. Это предотвращает id-collision при параллельных sub-runs одного дня (incident 2026-05-14: MIGR.M.015 claimed двумя reports одновременно). См. `inbox/feedback-log.md` 2026-05-15.
+3. **Cross-Pack duplicate check (NEW 2026-05-15):** прежде чем создать новый файл — grep ключевого тезиса (3-5 уникальных слов) по ВСЕМ Pack-* репо, не только в proposed target. Кандидат может уже существовать в другом тематическом файле (incident 2026-04-22: «SOTA-верификация ментора» предложен в `06-management-methods.md`, но уже был в `13-laputin-framework.md §4a.1`). См. `inbox/feedback-log.md` 2026-05-15.
+4. **Canonical-vs-legacy routing (NEW 2026-05-15):** для Pack-operations после Phase 2 refactor (14.05.2026) — новые сущности `failure-mode` / `distinction` / `method` идут в canonical `05-failure-modes/OPS.FM.NNN-*.md` / `06-distinctions/OPS.D.NNN-*.md` / `03-methods/OPS.M.NNN-*.md`, НЕ в legacy thematic (07-org-building-sota.md / 08-compliance.md / 09-elicitation-method.md). Исключение: правило-принцип «§9.X» и «принцип Лапутина» (короткие, под последовательную нумерацию) → legacy thematic. См. `inbox/feedback-log.md` 2026-05-15.
+5. Имя файла: по конвенции из routing.md § 3
+6. Создай содержимое по шаблону (шаблоны — в `prompts/session-close.md`, шаг 4d)
 
 **2d. Валидация:**
 
 - [ ] Есть frontmatter?
-- [ ] Правильная директория?
-- [ ] Нет дубликата?
+- [ ] Правильная директория (canonical для новых FM/D/M, legacy для §9.X / §13 Лапутин)?
+- [ ] Нет дубликата (cross-Pack grep, не только в target file)?
+- [ ] ID не claimed другим pending-review отчётом?
 - [ ] Соответствует bounded context?
 - [ ] Не governance-контент?
 - [ ] Не похож на паттерн из feedback-log.md?
