@@ -54,59 +54,6 @@
 4. **Проверка bounded context:** Прочитай `00-pack-manifest.md` целевого Pack'а — попадает ли кандидат в scope?
 5. **Если не попадает ни в один Pack** → предложи defer и уточни у пользователя
 
-## 4a. Pre-write checks (NEW 2026-05-15, обязательные)
-
-> Извлечены из 3 insights apply-captures session 2026-05-15. Если хотя бы один check fail — изменить target_path / id / target_file прежде чем фиксировать в отчёте.
-
-### 4a.1 Cross-Pack duplicate grep
-
-Прежде чем создать новый файл / секцию:
-
-```bash
-# grep по ключевому тезису (3-5 уникальных слов) по ВСЕМ Pack-* репо
-grep -rin "ключевой термин" $WORKSPACE_DIR/Pack-*/ $WORKSPACE_DIR/PACK-*/ 2>/dev/null
-```
-
-Если найдено existing entity — это **duplicate / extension candidate**, не new. Возможные действия:
-- Reject как duplicate (если содержательно совпадает)
-- Extension (добавить evidence/section к существующей entity)
-- Альтернативный target_path (тематически более правильный файл)
-
-**Incident reference:** «SOTA-верификация ментора» предложен в `06-management-methods.md`, но уже существовал в `13-laputin-framework.md §4a.1` (incident 2026-04-22). См. `inbox/feedback-log.md`.
-
-### 4a.2 Pending-id collision check
-
-Прежде чем зафиксировать ID (MIGR.M.NNN / OPS.FM.NNN / DP.D.NNN):
-
-```bash
-# claimed ids = (existing files) ∪ (pending reports already proposed)
-existing=$(ls $PACK_DIR/{category}/ | grep -oE '{PREFIX}\.{TYPE}\.[0-9]+' | sort -u)
-pending=$(grep -hE '{PREFIX}\.{TYPE}\.[0-9]+' $GOVERNANCE_REPO/inbox/extraction-reports/*.md 2>/dev/null | grep -oE '{PREFIX}\.{TYPE}\.[0-9]+' | sort -u)
-claimed=$(echo "$existing $pending" | tr ' ' '\n' | sort -u)
-# next free = max(claimed) + 1 ИЛИ первый gap
-```
-
-Если id уже claimed — взять next free. Это критично при параллельных sub-runs одного дня (extractor может запускаться 2-3 раза за день launchd-ом).
-
-**Incident reference:** MIGR.M.015 claimed двумя reports одновременно (2026-05-14-inbox-check.md и 2026-05-14-inbox-check-3.md). См. `inbox/feedback-log.md`.
-
-### 4a.3 Canonical-vs-legacy routing (Pack-operations specific)
-
-Pack-operations после Phase 2 refactor (14.05.2026) имеет hybrid structure. Правило выбора target_path:
-
-| Тип кандидата | Target |
-|---------------|--------|
-| Новый `failure-mode` (entity-level) | canonical `05-failure-modes/OPS.FM.NNN-*.md` |
-| Новый `distinction` (structural insight) | canonical `06-distinctions/OPS.D.NNN-*.md` |
-| Новый `method` (entity-level) | canonical `03-methods/OPS.M.NNN-*.md` |
-| Новая `role` (entity-level) | canonical `08-roles/OPS.R.NNN-*.md` |
-| Подпункт §9.X decision principle (1-2 параграфа) | legacy `06-management-methods.md` |
-| Подпункт принципа Лапутина | legacy `13-laputin-framework.md` |
-
-**Правило выбора:** entity-уровень (большая formalization, frontmatter, structure) → canonical. Короткое правило-принцип под последовательную нумерацию → legacy thematic.
-
-**Incident reference:** 2026-05-03 R2 предложил Compliance-decay → `08-compliance.md` (legacy); R15 пересдвинул в `OPS.FM.041` (canonical). Аналогично Бойло-noticer → `OPS.D.043`. См. `inbox/feedback-log.md`.
-
 ## 5. DS Routing (реализационное знание)
 
 > Реализационное знание (вендор, стек, деплой, конфигурация) → DS-репо, **не Pack**.

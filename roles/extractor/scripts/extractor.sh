@@ -213,40 +213,6 @@ case "$1" in
         fi
 
         run_claude "inbox-check"
-
-        # Post-gen id-collision check (insight 2026-05-15 apply-captures session).
-        # R2 в prompt уже инструктирован проверять pending-id, но добавляем
-        # script-level validation на случай если check пропущен. Не исправляет,
-        # только логирует — manual resolution через /apply-captures.
-        # Triggers только между ДРУГИМИ pending-review reports (не latest, не уже
-        # обработанные applied/rejected/deferred — там id уже зарезервирован легитимно).
-        REPORTS_DIR="$WORKSPACE/{{GOVERNANCE_REPO}}/inbox/extraction-reports"
-        if [ -d "$REPORTS_DIR" ]; then
-            LATEST_REPORT=$(ls -t "$REPORTS_DIR"/${DATE}-inbox-check*.md 2>/dev/null | head -1)
-            if [ -n "$LATEST_REPORT" ]; then
-                LATEST_NAME=$(basename "$LATEST_REPORT")
-                # Извлекаем proposed ids формата PREFIX.TYPE.NNN ИЗ блоков «Куда записать»
-                # и «target_path:» — это место, где R2 заявляет претензию на id.
-                NEW_IDS=$(grep -hE '(^id: |target_path:|Файл:.*[A-Z]+\.[A-Z]+\.[0-9]+)' "$LATEST_REPORT" 2>/dev/null \
-                    | grep -oE '[A-Z][A-Z]+\.[A-Z]+\.[0-9]+' | sort -u)
-                COLLISIONS=""
-                for id in $NEW_IDS; do
-                    # Считаем другие pending-review reports, упоминающие этот id
-                    OTHER_PENDING=0
-                    for r in "$REPORTS_DIR"/*.md; do
-                        [ "$(basename "$r")" = "$LATEST_NAME" ] && continue
-                        head -20 "$r" 2>/dev/null | grep -q "^status: pending-review" || continue
-                        grep -qE "(^id: $id\$|target_path:.*$id|Файл:.*$id)" "$r" 2>/dev/null && OTHER_PENDING=$((OTHER_PENDING+1))
-                    done
-                    [ "$OTHER_PENDING" -gt 0 ] && COLLISIONS="$COLLISIONS $id"
-                done
-                if [ -n "$COLLISIONS" ]; then
-                    log "WARN: id-collision detected in $LATEST_NAME: $COLLISIONS — resolve in /apply-captures (rename to next free id)"
-                    notify "KE: id-collision" "Conflict in latest report: $COLLISIONS"
-                fi
-            fi
-        fi
-
         notify_telegram "inbox-check"
         ;;
 
