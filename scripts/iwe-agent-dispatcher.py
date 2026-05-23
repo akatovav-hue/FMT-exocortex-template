@@ -37,11 +37,21 @@ import time
 from pathlib import Path
 
 # === Конфигурация (можно переопределить через env vars или CLI args) ===
-GOV_REPO_URL = os.environ.get("IWE_DISPATCHER_REPO_URL", "")  # обязательно задать через env
+GOV_REPO_URL = os.environ.get("IWE_DISPATCHER_REPO_URL", "https://github.com/TserenTserenov/${IWE_GOVERNANCE_REPO:-DS-strategy}.git")
 GOV_BRANCH = os.environ.get("IWE_DISPATCHER_REPO_BRANCH", "main")
 LOCK_FILE = os.environ.get("IWE_DISPATCHER_LOCK_FILE", "/tmp/iwe-agent-dispatcher.lock")
 LOCK_TTL_MIN = int(os.environ.get("IWE_DISPATCHER_LOCK_TTL_MIN", "50"))
 MODEL_DEFAULT = os.environ.get("IWE_DISPATCHER_MODEL_DEFAULT", "sonnet")
+
+# WP-200 Ф1: kind → model tiering (Model Tiering Design, Ф0 research)
+KIND_TO_MODEL: dict[str, str] = {
+    "research":   "haiku",   # smoke, status-check, grep — trivial
+    "scout":      "haiku",   # daily monitoring — trivial
+    "analyze":    "sonnet",  # structured analysis with rubrics — closed-loop
+    "soak":       "sonnet",  # verification against acceptance criteria — closed-loop
+    "synthesize": "opus",    # knowledge synthesis, Pack creation — open-loop
+    "plan":       "opus",    # planning, WP design — open-loop
+}
 CLAUDE_TIMEOUT_SEC = int(os.environ.get("IWE_DISPATCHER_CLAUDE_TIMEOUT_SEC", "1800"))
 COMMIT_AUTHOR_NAME = os.environ.get("IWE_DISPATCHER_AUTHOR_NAME", "IWE Agent Dispatcher")
 COMMIT_AUTHOR_EMAIL = os.environ.get("IWE_DISPATCHER_AUTHOR_EMAIL", "noreply@example.com")
@@ -284,19 +294,9 @@ def release_lock() -> None:
 
 # === Git operations ===
 
-def _repo_basename() -> str:
-    """Извлекает имя репо из URL: https://.../my-repo.git → my-repo."""
-    if not GOV_REPO_URL:
-        raise RuntimeError("IWE_DISPATCHER_REPO_URL не задан (env var)")
-    name = GOV_REPO_URL.rsplit("/", 1)[-1]
-    if name.endswith(".git"):
-        name = name[:-4]
-    return name
-
-
 def ensure_workdir(workdir: Path) -> None:
     """Гарантирует наличие свежего клона."""
-    repo_dir = workdir / _repo_basename()
+    repo_dir = workdir / "${IWE_GOVERNANCE_REPO:-DS-strategy}"
     if not repo_dir.exists():
         workdir.mkdir(parents=True, exist_ok=True)
         log(f"Cloning {GOV_REPO_URL} → {repo_dir}")
@@ -476,7 +476,8 @@ def write_result(repo_dir: Path, task_id: str, fm: dict,
         f"status: {'completed' if ok else 'failed'}\n"
         f"started_at: {started_at.isoformat()}\n"
         f"finished_at: {finished_at.isoformat()}\n"
-        f"model: {fm.get('model', MODEL_DEFAULT)}\n"
+        f"model: {_resolve_model(fm)}\n"
+        f"kind: {fm.get('kind', '')}\n"
         f"dispatcher: iwe-agent-dispatcher.py\n"
         f"channel: claude-cli-headless\n"
         f"---\n\n"
@@ -511,7 +512,7 @@ def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
         log(f"---PROMPT START---\n{prompt[:500]}...\n---PROMPT END---")
         return False
 
-    model = fm.get("model") or _agent_to_model(fm.get("agent", "ccr-opus"))
+    model = _resolve_model(fm)
     started_at = now_utc()
 
     # Mark task as assigned
@@ -529,19 +530,8 @@ def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
     finished_at = now_utc()
     log(f"claude done ok={ok} duration={(finished_at - started_at).total_seconds():.0f}s")
 
-    # Sync with origin: agent may have committed its own result during execution.
-    # reset --hard picks up those commits before we write dispatcher's status update.
-    log("Syncing with origin after claude returned...")
-    run(["git", "fetch", "origin", GOV_BRANCH], cwd=repo_dir, timeout=30)
-    run(["git", "reset", "--hard", f"origin/{GOV_BRANCH}"], cwd=repo_dir, timeout=30)
-
-    # Write result only if agent didn't already write it
-    results_dir = repo_dir / "inbox" / "agent" / "results"
-    result_path = results_dir / f"RESULT-{task_id.replace('TASK-', '')}.md"
-    if result_path.exists():
-        log(f"Agent already wrote result file — skipping dispatcher write")
-    else:
-        result_path = write_result(repo_dir, task_id, fm, ok, output, started_at, finished_at)
+    # Write result
+    result_path = write_result(repo_dir, task_id, fm, ok, output, started_at, finished_at)
 
     # Update task status
     update_task_frontmatter(task_path, {
@@ -550,7 +540,7 @@ def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
     })
     commit_and_push(repo_dir,
         f"dispatch(WP-324): {task_id} → {'completed' if ok else 'failed'}",
-        [task_path])
+        [task_path, result_path])
 
     return True
 
@@ -563,6 +553,16 @@ def _agent_to_model(agent: str) -> str:
     if "haiku" in agent:
         return "haiku"
     return MODEL_DEFAULT
+
+
+def _resolve_model(fm: dict) -> str:
+    """WP-200 Ф1: priority — explicit model > kind tiering > agent name > default."""
+    if fm.get("model"):
+        return fm["model"]
+    kind = fm.get("kind", "")
+    if kind in KIND_TO_MODEL:
+        return KIND_TO_MODEL[kind]
+    return _agent_to_model(fm.get("agent", "ccr-sonnet"))
 
 
 def main():
@@ -582,7 +582,7 @@ def main():
 
     try:
         ensure_workdir(args.workdir)
-        repo_dir = args.workdir / _repo_basename()
+        repo_dir = args.workdir / "${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
         pending = find_pending_tasks(repo_dir, filter_id=args.task)
         log(f"Найдено pending+due tasks: {len(pending)}")
