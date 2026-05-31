@@ -3,6 +3,14 @@ name: week-close
 description: "Протокол закрытия недели (Week Close). Ретро 7 дней + carry-over в новую неделю + платформенные шаги (бэкап, dirty repos)."
 argument-hint: ""
 version: 1.2.0
+layer: L1
+status: active
+triggers:
+  slash: [/week-close]
+  phrases: []
+routing:
+  executor: sonnet
+  deterministic: false
 ---
 
 # Week Close (протокол закрытия недели)
@@ -23,6 +31,7 @@ Week Close = протокол. Исполнять ТОЛЬКО пошагово 
 
 ### 1. Сбор данных за 7 дней
 
+**Коммиты:**
 ```bash
 for repo in $(ls {{WORKSPACE_DIR}}/); do
   if [ -d {{WORKSPACE_DIR}}/$repo/.git ]; then
@@ -63,6 +72,26 @@ bash {{WORKSPACE_DIR}}/scripts/server-calendar.sh --week $(date -v-mon +%Y-%m-%d
 
 Незавершённые РП с pending/in_progress статусами → перенести в новый WeekPlan W{N+1} (создаст session-prep автоматически в Пн 04:00 либо вручную).
 
+### 5b. Pending фазы внутри активных РП (B-005)
+
+> **Зачем:** carry-over §5 работает на уровне РП (status: in_progress → перенос). Pending **фазы** внутри Ф-таблиц context-файлов могут потеряться: если родительский РП в `in_progress` — pending-фаза не выделяется автоматически; если родительский ушёл в `done` — фаза теряется вместе с context-файлом.
+
+```bash
+bash ${IWE_SCRIPTS}/pending-phases-sweep.sh
+```
+
+Скрипт обходит все `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/WP-*.md` со `status: in_progress` (или без явного status), извлекает строки Ф-таблицы со статусом `⏳ pending` / `pending`, выводит сводку формата:
+
+```
+WP-NNN: pending-фазы (M):
+  Фx — <описание фазы>
+  Фy — <описание фазы>
+```
+
+Для каждой pending-фазы решить: **(a)** делать на этой неделе → добавить в W{N+1} как явный пункт; **(b)** переоценить (блокер? устарела?); **(c)** оставить как есть (если ожидание внешнего события — записать ожидаемый триггер).
+
+Если скрипта нет — fallback: `grep -l "status: in_progress" {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/WP-*.md` → для каждого `grep -E "⏳.*pending|Ф[0-9]+.*pending"`.
+
 ### 6. Captures и уроки
 
 - Просмотреть `inbox/fleeting-notes.md` за неделю → маршрутизировать невыключенные.
@@ -71,9 +100,21 @@ bash {{WORKSPACE_DIR}}/scripts/server-calendar.sh --week $(date -v-mon +%Y-%m-%d
 
 ### 7. Платформенные шаги
 
-#### 7a. Бэкап IWE в iCloud
+#### 7a. Проверка здоровья бэкапов
 
-> Условный шаг: только macOS с iCloud Drive.
+> Обязательный шаг перед бэкапом. Запускает `iwe-backup-check.sh` (WP-317 supplement).
+
+```bash
+bash ${IWE_SCRIPTS}/iwe-backup-check.sh
+```
+
+Если вернул ❌ (exit 2) — устранить критичные gaps ДО бэкапа (устаревший бэкап >14 дней, нет iCloud).  
+Если вернул ⚠️ (exit 1) — зафиксировать warnings в WeekReport, продолжить.  
+Если ✅ (exit 0) — бэкап в норме.
+
+#### 7b. Бэкап IWE в iCloud
+
+> Условный шаг: только macOS с iCloud Drive. Запускать ТОЛЬКО если 7a не вернул ❌.
 
 ```bash
 ${IWE_SCRIPTS}/backup-icloud.sh
@@ -81,7 +122,7 @@ ${IWE_SCRIPTS}/backup-icloud.sh
 
 Архив всех файлов IWE (без `.git`, `node_modules`, `.venv`) → iCloud Drive. Хранит 4 последних архива.
 
-#### 7b. Скан незакоммиченных файлов
+#### 7c. Скан незакоммиченных файлов
 
 ```bash
 ${IWE_SCRIPTS}/check-dirty-repos.sh
@@ -89,7 +130,7 @@ ${IWE_SCRIPTS}/check-dirty-repos.sh
 
 Если есть грязные репо → закоммитить и запушить ДО завершения Week Close.
 
-#### 7c. Memory Validate (T22b, WP-217 Ф10.2)
+#### 7d. Memory Validate (T22b, WP-217 Ф10.2)
 
 ```bash
 bash ${IWE_SCRIPTS}/memory-bleed.sh
@@ -98,7 +139,7 @@ bash ${IWE_SCRIPTS}/memory-bleed.sh
 **Нарушения** (HOT-лимит, orphans, superseded_by без ссылки) → исправить до коммита Week Close.
 **Кандидаты на понижение горизонта** → информативно, пользователь решает при следующем Month Close.
 
-#### 7d. ТО памяти (T, SC.024.3 §5)
+#### 7e. ТО памяти (T, SC.024.3 §5)
 
 > Проверка здоровья статической нагрузки контекста. Флаги — информативно, пользователь решает.
 
@@ -158,8 +199,11 @@ cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}} && git add -A && git commit -m "week-cl
 - [ ] Ретро 7 дней: closed/partial/not_started/blocked разобраны
 - [ ] Метрики посчитаны (completion rate, мультипликатор)
 - [ ] Carry-over → W+1 (или явно «нет»)
+- [ ] Pending фазы активных РП обойдены (`pending-phases-sweep.sh` или fallback grep) — решения зафиксированы
+- [ ] Backlog `docs/Backlog.md` обойдён в следующую Strategy Session (либо триггеры активированы, либо явно «B-NNN живёт без триггеров»)
 - [ ] Captures маршрутизированы, уроки записаны
 - [ ] Drift-scan недели: устаревшие факты обновлены
+- [ ] Проверка бэкапов (iwe-backup-check.sh) выполнена
 - [ ] iCloud backup выполнен (если macOS)
 - [ ] Dirty repos: 0 (или явно проигнорированы)
 - [ ] ТО памяти: distinctions.md/MEMORY.md/memory/*.md проверены, флаги зафиксированы (или «норма»)

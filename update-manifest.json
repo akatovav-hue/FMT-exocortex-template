@@ -105,6 +105,9 @@
       "path": ".claude/skills/apply-captures/SKILL.md"
     },
     {
+      "path": ".claude/skills/agent-fault/SKILL.md"
+    },
+    {
       "path": ".claude/skills/archgate/SKILL.md"
     },
     {
@@ -630,6 +633,15 @@
       "path": "scripts/day-close.sh"
     },
     {
+      "path": "scripts/day-open-scaffold.sh"
+    },
+    {
+      "path": "scripts/generate-executor-catalog.py"
+    },
+    {
+      "path": "scripts/generate-helper-catalog.py"
+    },
+    {
       "path": "scripts/generate-skills-catalog.sh"
     },
     {
@@ -643,6 +655,9 @@
     },
     {
       "path": "scripts/iwe-audit.sh"
+    },
+    {
+      "path": "scripts/iwe-backup-check.sh"
     },
     {
       "path": "scripts/iwe-drift-helpers/check-arch-version.sh"
@@ -687,7 +702,16 @@
       "path": "scripts/pack-ci-install.sh"
     },
     {
+      "path": "scripts/route-task.sh"
+    },
+    {
       "path": "scripts/script-promote.sh"
+    },
+    {
+      "path": "scripts/smoke-clean-env.sh"
+    },
+    {
+      "path": "scripts/test-route-task.sh"
     },
     {
       "path": "scripts/server-calendar.sh"
