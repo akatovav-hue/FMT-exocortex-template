@@ -27,6 +27,9 @@ substituted:
   - roles/strategist/scripts/launchd/com.strategist.morning.plist
   - roles/strategist/scripts/launchd/com.strategist.weekreview.plist
   - roles/strategist/scripts/strategist.sh
+  # WP-73: cleanup-процессор note-review вызывается из $SCRIPT_DIR (runtime),
+  # поэтому должен жить в .iwe-runtime/. Плейсхолдеров нет — sed безвреден.
+  - roles/strategist/scripts/cleanup-processed-notes.py
 
   # Extractor (извлечение знаний)
   - roles/extractor/scripts/launchd/com.extractor.inbox-check.plist

@@ -22,7 +22,10 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
 # Guard: IWE_GOVERNANCE_REPO mismatch (Claude peer-review, 2026-05-26)
-EXPECTED_GOV=$(grep 'IWE_GOVERNANCE_REPO=' "$HOME/.iwe-paths" 2>/dev/null | sed 's/.*="//;s/"$//' || echo "DS-strategy")
+EXPECTED_GOV=$(grep 'IWE_GOVERNANCE_REPO=' "$HOME/.iwe-paths" 2>/dev/null | sed 's/.*="//;s/"$//')
+# WP-73 fix: pipe маскирует grep-fail → прежний `|| echo` не срабатывал, EXPECTED_GOV=""
+# → ложный mismatch-WARN при каждом запуске (~/.iwe-paths не содержит IWE_GOVERNANCE_REPO).
+[ -n "$EXPECTED_GOV" ] || EXPECTED_GOV="DS-strategy"
 if [ "${IWE_GOVERNANCE_REPO:-}" ] && [ "$IWE_GOVERNANCE_REPO" != "$EXPECTED_GOV" ]; then
     echo "WARN: IWE_GOVERNANCE_REPO=$IWE_GOVERNANCE_REPO, expected $EXPECTED_GOV (from ~/.iwe-paths)" >&2
 fi
@@ -109,6 +112,30 @@ notify_telegram() {
     [ -f "$notify_script" ] && "$notify_script" strategist "$scenario" >> "$LOG_FILE" 2>&1 || true
 }
 
+# WP-73: дождаться сетевой готовности перед сетевыми вызовами.
+# Корень сбоев 04-05.06: Mac на батарее ночью → scheduled wake в 03:55 не срабатывает →
+# morning запускается поздно (при открытии крышки), когда WiFi/DNS ещё не подняты →
+# "Could not resolve host" / "Request timed out". Транзиентно (через 1-2 мин ОК).
+# curl rc 6 = DNS-fail, 7 = connect-fail → сеть не готова; иначе (вкл. HTTP-ошибки) — готова.
+wait_for_network() {
+    local url="${IWE_NET_CHECK_URL:-https://api.anthropic.com/}"
+    local tries="${IWE_NET_CHECK_TRIES:-24}"   # 24 × 5s = до 2 мин ожидания
+    local i=1 crc
+    while [ "$i" -le "$tries" ]; do
+        crc=0
+        curl -sS -m 4 -o /dev/null "$url" >/dev/null 2>&1 || crc=$?
+        if [ "$crc" -ne 6 ] && [ "$crc" -ne 7 ]; then
+            [ "$i" -gt 1 ] && log "Сеть готова после $(( (i-1) * 5 ))s ожидания"
+            return 0
+        fi
+        [ "$i" -eq 1 ] && log "WARN: сеть недоступна (curl rc=$crc) — ждём готовности до $((tries * 5))s"
+        sleep 5
+        i=$((i + 1))
+    done
+    log "WARN: сеть не поднялась за $((tries * 5))s — продолжаем, Claude CLI обработает сам"
+    return 0
+}
+
 run_claude() {
     local command_file="$1"
     # Опциональная модель: второй аргумент или IWE_STRATEGIST_MODEL из env.
@@ -163,18 +190,37 @@ ${prompt}"
         model_args=(--model "$model_override")
         log "Model override: $model_override"
     fi
+    # WP-73: дождаться сети перед вызовом (lazy wake → WiFi/DNS не готовы).
+    wait_for_network
+
+    # WP-73: bounded retry на транзиентные сбои. Каскад 05.06: после позднего wake
+    # claude падал на DNS-timeout (07:32) и 401 Invalid credentials (07:41) — оба
+    # саморазрешились к 09:24. Retry с паузой превращает транзиентный сбой в успех
+    # без ручного вмешательства. Нормальный success-путь (rc=0) не затрагивается.
+    local attempt=1
+    local max_attempts="${IWE_CLAUDE_MAX_ATTEMPTS:-3}"
+    local retry_delay="${IWE_CLAUDE_RETRY_DELAY:-30}"
     # NB: --dangerously-skip-permissions не используется — Claude Code блокирует флаг
     # под root/sudo (Linux cron). --allowedTools задаёт явный whitelist, чего достаточно.
-    timeout "$CLAUDE_TIMEOUT" "$CLAUDE_PATH" \
-        "${model_args[@]}" \
-        --allowedTools "Read,Write,Edit,Glob,Grep,Bash" \
-        -p "$prompt" \
-        >> "$LOG_FILE" 2>&1 || rc=$?
+    while :; do
+        rc=0
+        timeout "$CLAUDE_TIMEOUT" "$CLAUDE_PATH" \
+            "${model_args[@]}" \
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash" \
+            -p "$prompt" \
+            >> "$LOG_FILE" 2>&1 || rc=$?
+        [ $rc -eq 0 ] && break
+        [ "$attempt" -ge "$max_attempts" ] && break
+        log "WARN: Claude CLI rc=$rc (попытка $attempt/$max_attempts) — возможно транзиентный сбой; retry через ${retry_delay}s"
+        sleep "$retry_delay"
+        wait_for_network
+        attempt=$((attempt + 1))
+    done
 
     if [ $rc -eq 124 ]; then
         log "WARN: Claude CLI timed out after ${CLAUDE_TIMEOUT}s for scenario: $command_file"
     elif [ $rc -ne 0 ]; then
-        log "WARN: Claude CLI exited with code $rc for scenario: $command_file"
+        log "WARN: Claude CLI exited with code $rc for scenario: $command_file (после $attempt попыток)"
     fi
 
     if [ $rc -eq 0 ]; then
