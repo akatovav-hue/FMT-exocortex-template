@@ -21,11 +21,4 @@
 - **Экзоскелет ≠ Автопилот** (DP.D.046). Усиление мышления / LLM автономно. Тест: можешь объяснить без «ИИ подсказал»?
 - **Лог ≠ Инцидент ≠ State file** (DP.D.049). Хронология у исполнителя / сбой+разбор в governance / снимок у исполнителя.
 - **Скрипт ≠ Агент** (DP.D.048). Фиксированный flow / LLM выбирает шаг. Тест: уберу LLM — сломается?
-- **AUTHOR-ONLY зоны** в `memory/protocol-*.md`: `<!-- AUTHOR-ONLY -->...<!-- /AUTHOR-ONLY -->` — авторский контент, не затирать при sync.
-- **strategy_day:** из `day-rhythm-config.yaml`. В этот день: session-prep вместо day-plan, DayPlan не создаётся.
-- **Ru-first (SPF §5 п.13):** Русский — основной язык. EN только для: YAML-ключей, аббревиатур, имён собственных.
-- **OAuth через бота**, не ручные ключи. Все интеграции — через OAuth.
-- **Проектировать роль агента в контексте**, не «проектировать агента» (DP.D.025).
-- **Session request ≠ Task (Agent Inbox)** (WP-358, 26-27 мая). Task (DP.SC.135): `due/template/acceptance`, SLA ≤1ч, batch. Session: real-time без `due` и `template`. Тест: «есть `due` и `acceptance`?» Нет → session request. Отдельная папка `inbox/agent/sessions/`, dispatcher `--mode session`.
-- **Session: light ≠ heavy** (DP.SC.162, WP-358, 27 мая). light ≤200 токенов, sync SLA P95≤45с. heavy >200 токенов, async + прогресс-нотификации каждые 15с. Тест: «ответ ≤200 токенов за 45с?» Нет → heavy.
-- **Ход (turn) ≠ Сессия** (DP.SC.162 v2, WP-358, 27 мая). Сессия = весь multi-turn диалог (1..N ходов), идентифицируется `session_id`. Ход = одна пара запрос+ответ, `(session_id, turn_n)`. Timeout сессии (60 мин тишины) ≠ timeout хода (15 мин hard cut-off).
+- **TPF (уровень принципов) ≠ DS (слой репозиториев).** TPF — место в лестнице принципов; DS — репозиторий, где эта работа материализуется.

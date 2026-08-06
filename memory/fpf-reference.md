@@ -1,5 +1,5 @@
 ---
-valid_from: 2026-04-06
+valid_from: 2026-08-02
 originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 
 type: reference
@@ -8,6 +8,8 @@ domains: [reference]
 status: active
 owner: user
 schema_version: 1
+fpf_version: "9a9a42e4d154021ca3f7415e0009a4214832f65f"
+fpf_synced_at: 2026-08-02
 
 name: "fpf-reference"
 description: "Справочник FPF паттернов применимых в IWE: структура, ключевые Part C (C.11-C.28), трансляция терминов"
@@ -140,6 +142,19 @@ description: "Справочник FPF паттернов применимых �
 | Lawful Comparison (A.19) | Сравнение вариантов по одинаковым критериям | Выбор архитектуры (/archgate) |
 | Strict Distinction (A.7) | Разные вещи — разные имена. Не смешивать в одном типе/enum | Code review, именование |
 
+## Терминология ailev ↔ IWE (DPF/SPF/TPF/LPF, WP-448 Ф8)
+
+> Анатолий Левенчук (ailev) переименовал Second Principles Framework в DPF (Domain Principles Framework), стек `FPF → DPF → LPF`. В IWE переименование не планируется — только сноски (CLAUDE.md §1, SPF/README.md). Таблица ниже — словарь перевода при чтении его текстов.
+
+| ailev-термин | IWE-эквивалент | Примечание |
+|---|---|---|
+| DPF (Domain Principles Framework) | Pack (SPF-инстанс) | формальная эквивалентность, не переименование |
+| TPF (Third Principles Framework) | DS + операционный слой агента | процессный TPF vs контентный TPF — см. [[TPF ≠ DS]] |
+| LPF (практики роли конкретного носителя) | партикулярные практики роли (Lifework/ + оперативные фрагменты) | cross-cutting классификация фрагментов, не отдельный контейнер (WP-448 Ф11) |
+| `E.4.DPF` (authoring-каркас) | `SPF/pack-template/` + `SPF/process/01-11` | оба задают форму и процесс наполнения домена |
+| NSTD (слоты метод-карточки: Forces, Bias-Annotation, ...) | `_method-card-template.md` (обогащение — WP-448 Ф9) | наш формат карточки метода обогащается двумя разделами по образцу NSTD |
+| Нарративизация (narrativization) | Фабрика руководств (WP-364) | метод превращения структуры в учебный текст — берём по ссылке, без дублирования содержания |
+
 ## Обновление
 
-Периодически: `cd {{HOME_DIR}}/IWE/FPF && git pull`
+Периодически: `cd {{HOME_DIR}}/IWE/FPF && git pull`. FPF обновляется ~раз в 2 недели (апстрим). После pull — проверить `memory/fpf-term-map.yaml` на новые переименования (WP-481 Ф11).

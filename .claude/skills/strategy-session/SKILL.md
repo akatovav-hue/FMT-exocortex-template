@@ -10,11 +10,25 @@ triggers:
 routing:
   executor: opus
   deterministic: false
+agents: single
+interaction: multi-step
+gates_required: []
+gates_enforced: []
+gates_rationale: "операционный скилл; WP Gate применим только при создании нового РП, не для операционных вызовов"
 ---
 
 # Strategy Session — диспетчер
 
 > Один skill, два режима. Выбор по факту наличия артефактов в `{{GOVERNANCE_REPO}}/`.
+
+## When to use
+
+Стратегическая сессия — диспетчер. День-0 (нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). День-1+ → weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать».
+
+## Algorithm
+
+### Шаг 0. Extensions (before)
+`bash .claude/scripts/load-extensions.sh strategy-session before` → Exit 0: Read каждый файл, выполнить. Exit 1: пропустить.
 
 ## Шаг 1. Определить режим
 
@@ -26,7 +40,7 @@ routing:
 | Состояние | Режим | Куда дальше |
 |-----------|-------|-------------|
 | Нет ни Strategy.md, ни WeekPlan | **initial** (день-0) | §2 этого файла |
-| Есть Strategy.md и/или WeekPlan со `status: draft` | **weekly** | `roles/strategist/prompts/strategy-session.md` |
+| Есть Strategy.md и/или WeekPlan со `status: draft` | **weekly** | `roles/strategist/prompts/strategy-session-weekly.md` |
 | Есть Strategy.md, но нет draft WeekPlan | weekly без draft | сообщи пользователю: «нет черновика, запустить session-prep?» |
 
 ---
@@ -76,6 +90,16 @@ routing:
 
 Скажи: «Готово. Завтра утром можешь сказать "открывай день" — Стратег соберёт DayPlan на сегодня. По понедельникам в 04:00 автоматически готовится session-prep для следующей сессии.»
 
+**Extensions (after):** `bash .claude/scripts/load-extensions.sh strategy-session after` → Exit 0: Read каждый файл, выполнить. Exit 1: пропустить.
+
+---
+
+## БЛОКИРУЮЩЕЕ: один шаг за раз
+
+> Нарушение этого правила делает сессию бессмысленной — пилот не вносит свои данные, решения принимаются без него.
+
+**После выполнения ЛЮБОГО шага — СТОП.** Не читать следующий шаг, не продолжать. Ждать сообщения пилота. Следующий шаг — только после его ответа. Это правило действует даже после compaction, даже если gate = `auto`, даже если «очевидно что делать дальше».
+
 ---
 
 ## Шаг 3. Weekly flow
@@ -95,6 +119,30 @@ routing:
 
 **Цель шага:** Backlog не должен превращаться в dead inventory. Каждый Strategy Session — явная сверка триггеров.
 
-### 3.2 Делегирование в роль Стратега
+### 3.2 Распаковка R1: discovery (Стратег) → планирование (Плановик)
 
-Загрузи `{{IWE_TEMPLATE}}/roles/strategist/prompts/strategy-session.md` и следуй ему.
+> **Роль R1 распакована (РП378):** Стратег ведёт WHAT/WHY (discovery неудовлетворённостей,
+> состояние, приоритеты месяца), Плановик (DP.ROLE.066) — HOW MUCH/WHEN (упаковка в неделю,
+> бюджеты, WIP, дни). Граница — по типу решения, не по артефакту.
+
+**Режим discovery (Стратег, этапы 1-4 — НЭП → приоритеты).**
+Если приоритеты месяца устарели ИЛИ состояние пилота изменилось ИЛИ это первый месяц —
+сначала разговор-распаковка: запусти `/discovery-session` (метод DP.METHOD.053). На выходе —
+state-card + 3 топ-неудовлетворённости + ранжированные приоритеты месяца + ТОС-месяца. Это
+**контекст приоритетов**, передаётся в планирование.
+
+**Режим планирования (Плановик, этапы 5-6 — упаковка недели/дня).**
+Если приоритеты актуальны (discovery не нужен) — Плановик ведёт неделю один (совместный
+ритуал DP.SC.051). Загрузи `{{IWE_TEMPLATE}}/roles/strategist/prompts/strategy-session-weekly.md`
+(если файл отсутствует → выполни `bash update.sh` или создай вручную; продолжи по базовому
+шаблону WeekPlan из этого SKILL.md)
+и следуй ему: упакуй контекст приоритетов в WeekPlan с бюджетами, распредели по дням, держи
+WIP-лимит (8-15).
+
+**Связка:** discovery даёт контекст приоритетов → планирование его упаковывает. Стратег
+подключается к недельному ритуалу только при триггере пересмотра; иначе — Плановик один.
+
+**Extensions (after):** `bash .claude/scripts/load-extensions.sh strategy-session after` → Exit 0: Read каждый файл, выполнить. Exit 1: пропустить.
+
+<!-- USER-SPACE -->
+<!-- /USER-SPACE -->

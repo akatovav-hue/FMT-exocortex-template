@@ -11,12 +11,22 @@ triggers:
 routing:
   executor: sonnet
   deterministic: false
+agents: single
+interaction: multi-step
+gates_required: []
+gates_enforced: []
+gates_rationale: "операционный скилл; WP Gate применим только при создании нового РП, не для операционных вызовов"
 ---
 
 # Week Close (протокол закрытия недели)
 
 > **Роль:** R1 Стратег. **Бюджет:** ~30 мин.
 > **Принцип:** SKILL.md = L1 платформенный файл. Пользователь не редактирует напрямую — только через `extensions/`.
+> **Стиль текста:** ретро недели и новый WeekPlan читает пилот → весь текст синтезировать в базе разговорного стиля (S0 база + S1 автор, источник DP.SC.050): русский, без машинных меток, главная мысль первой, код РП и путь не подлежащее.
+
+## When to use
+
+Протокол закрытия недели (Week Close). Ретро 7 дней + carry-over в новую неделю + платформенные шаги (бэкап, dirty repos).
 
 ## БЛОКИРУЮЩЕЕ: пошаговое исполнение
 
@@ -24,7 +34,7 @@ Week Close = протокол. Исполнять ТОЛЬКО пошагово 
 **Шаг 0 — ПЕРВОЕ действие:** создать список задач прямо сейчас (до любых других действий).
 Каждый шаг алгоритма → отдельная задача (pending → in_progress → completed).
 
-## Алгоритм
+## Algorithm
 
 ### 0. Extensions (before)
 Загрузить: `bash .claude/scripts/load-extensions.sh week-close before`. Exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить как первые шаги. Exit 1 → пропустить. Поддерживает `extensions/week-close.before.md` И `extensions/week-close.before.<suffix>.md`.
@@ -65,8 +75,9 @@ bash {{WORKSPACE_DIR}}/scripts/server-calendar.sh --week $(date -v-mon +%Y-%m-%d
 - Completion rate: X/Y РП (N%)
 - Коммитов всего, активных дней
 - WakaTime итог недели (физическое время)
-- Бюджет закрыт (сумма done × бюджет + partial × % × бюджет)
+- Бюджет закрыт (сумма done × бюджет + partial % × бюджет)
 - Мультипликатор недели = Бюджет закрыт / WakaTime
+- **Калибровка гипотез (WP-496, из шага 6a):** сверено N записей за неделю; из них с уверенностью ≥80% — доля подтвердившихся (порог: ≥0.9 от заявленной уверенности, иначе «уверенность завышена» — явно отметить в WeekReport). Если сверок не было на этой неделе — не считать, пропустить строку.
 
 ### 5. Carry-over → W+1
 
@@ -97,6 +108,18 @@ WP-NNN: pending-фазы (M):
 - Просмотреть `inbox/fleeting-notes.md` за неделю → маршрутизировать невыключенные.
 - Уроки сессий → MEMORY.md + thematic `lessons_*.md` (если есть).
 - Drift-scan недели: что в MEMORY.md устарело за 7 дней.
+- **Проверка полноты переноса перед архивацией (WP-5, 2026-07-10):** `bash {{IWE_SCRIPTS}}/check-wp-transfer-completeness.sh --all {{IWE_ROOT}}` по `inbox/WP-N/` — выводит `results_not_captured`-флаги (проставленные при закрытии без заполненного `results_in`) и файлы в подпапках без учёта в основном контекст-файле. Для каждого warning — пилот решает: (a) действительно нужен перенос знания, найти куда; (b) файл технический/устарел, можно оставить; (c) `results_in` заполнить постфактум. Не блокирует Close.
+
+### 6a. Сверка журнала гипотез (LPF, WP-496)
+
+> Регламент: `memory/lpf-hypothesis-log.md`. Журнал: `{{GOVERNANCE_REPO}}/current/hypotheses-log.md`.
+
+1. Прочитать `hypotheses-log.md` — отфильтровать записи со статусом «на сверке» И датой сверки ≤ сегодня. Записи со статусом «черновик» (не подтверждённые пилотом Note-Review) — пропустить, они не в цикле сверки.
+2. Для каждой найденной записи: сверить критерий фальсификации с доступной фактурой (коммиты недели, `domain_event`, инфраструктурные логи, факты из ретро §3-4 этого протокола).
+3. Предложить вердикт: подтверждена / опровергнута / частично подтверждена / неприменимо (если условие критерия физически не выполнено — например, зависимый артефакт не был доставлен — гипотеза не проверяема, не «опровергнута»).
+4. Пилот утверждает или правит вердикт → записать **новой** записью в конец журнала со ссылкой на исходную (`Сверка H-NNN`). Исходную запись не редактировать.
+5. Для каждого вердикта — явное действие (обновить уверенность на будущее / добавить шаг в чек-лист / завести РП / зафиксировать кандидат в паттерн — §6 Capture-to-Pack). Вердикт без действия = «повисший», не закрывать неделю с повисшими вердиктами.
+6. Если сверенных записей нет — пометить явно «сверка гипотез: 0 записей с наступившей датой» в WeekReport (не пропускать шаг молча).
 
 ### 7. Платформенные шаги
 
@@ -155,6 +178,21 @@ echo "=== memory/ файлы (mtime >14д) ===" && find {{MEMORY_DIR}} -name "*.
 | MEMORY.md строк | **> 200** | Флаг превышения лимита. Предложить архивацию старых feedback в `archive/`. |
 | memory/*.md без обращения > 14д | **> 5 файлов** | Предложить понизить `horizon: warm` (пользователь решает при Month Close). |
 
+#### 7f. Hindsight health check
+
+> **WP-337:** L2-memory = always-on, но требует периодической проверки.
+
+```bash
+echo "=== Hindsight container ===" && docker ps --format "table {{.Names}}\t{{.Status}}" | grep iwe-hindsight || echo "❌ Container not running"
+echo "=== Hindsight log (last 20) ===" && cat ~/.iwe/hindsight.log 2>/dev/null | tail -20 || echo "❌ No log file"
+```
+
+**Проверки:**
+- Container `iwe-hindsight` → статус `Up` (если `Down` → `bash ~/IWE/FMT-exocortex-template/exocortex/hindsight/start.sh`)
+- Лог без `FAIL` за неделю. Если есть FAIL → `docker logs iwe-hindsight` → диагностика (OpenAI key? network? disk?)
+- Размер БД: `docker exec iwe-hindsight ls -lh /data/hindsight.db` — если >100MB → флаг ротации
+- **Whitelist review:** нужно ли добавить новые скиллы в `RECALL_SKILLS` (созданные за неделю)?
+
 ### 8. Запись итогов в WeekReport (split, ОПТ-5)
 
 > **Split (WP-297 ОПТ-5):** факты недели живут в `WeekReport W{N}`, не в WeekPlan. WeekPlan — только намерения.
@@ -183,7 +221,16 @@ echo "=== memory/ файлы (mtime >14д) ===" && find {{MEMORY_DIR}} -name "*.
 ### 11. Закоммитить governance-репо
 
 ```bash
-cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}} && git add -A && git commit -m "week-close: W{N} итоги q:{score}" && git push
+cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}
+git status --short
+# НЕ git add -A/git add ./git add -u — AGENTS.md CRITICAL (может захватить работу других агентов)
+# Стейджить ТОЛЬКО файлы, изменённые в шагах 1-10 (в массив для pathspec):
+WC_FILES=(<каждый файл явным путём: WeekPlan, WeekReport, WP-REGISTRY, inbox/WP-*.md и т.д.>)
+git add "${WC_FILES[@]}"
+git diff --cached --name-only  # проверить scope — только week-close файлы
+# pathspec после `--`: commit ТОЛЬКО свои файлы, не подметаем чужой индекс
+git commit -m "week-close: W{N} итоги q:{score}" -- "${WC_FILES[@]}"
+git push
 ```
 
 ### 12. Верификация (Haiku R23)
@@ -209,7 +256,19 @@ cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}} && git add -A && git commit -m "week-cl
 - [ ] ТО памяти: distinctions.md/MEMORY.md/memory/*.md проверены, флаги зафиксированы (или «норма»)
 - [ ] Итоги W{N} записаны в WeekPlan
 - [ ] Extensions `.after.md` выполнены (если есть)
+- [ ] Hindsight: container Up, лог без FAIL за неделю, размер БД <100MB
 - [ ] Оценка качества недели q:N задана (1-5) и включена в commit message
 - [ ] Governance-репо закоммичено
+- [ ] Peer-сессии недели: WP Gate проверен (только сессии с 2026-06-09):
+  ```bash
+  find ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions -type f -name "peer-prompt.md" \
+    | awk -F/ '{d=$(NF-1); match(d,/^[0-9]{4}-[0-9]{2}-[0-9]{2}/); print substr(d,RSTART,RLENGTH) " " $0}' \
+    | awk '$1 >= "2026-06-09" {print $2}' \
+    | xargs -I{} sh -c 'grep -q "Открытие (WP Gate)" "{}" || echo "WP-GATE-MISS: {}"'
+  # Пропуски фиксировать в inbox/bugs/bug-YYYY-MM-DD-wp-gate-miss.md или «нет пропусков»
+  ```
 
 Все ✅ → «Неделя закрыта.» Иначе — указать что осталось.
+
+<!-- USER-SPACE -->
+<!-- /USER-SPACE -->
