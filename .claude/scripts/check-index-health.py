@@ -163,6 +163,12 @@ def fmt_file_line(path: Path, root: Path, findings: dict) -> str:
 
 
 def main() -> int:
+    # Windows console codepages (e.g. cp1251) don't cover all chars we print
+    # (×, emoji in scanned filenames); force UTF-8 stdout/stderr.
+    if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / "IWE"
     if not root.is_dir():
         print(f"FAIL: root dir not found: {root}", file=sys.stderr)

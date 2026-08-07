@@ -14,7 +14,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-INBOX_DIR="/Users/andrey_akatov/IWE/DS-strategy/inbox"
+INBOX_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox"
 EXTENSIONS="m4a mp4 wav mp3 webm"
 # Транскрипция через Buzz (GUI) — скрипт только детектирует и уведомляет
 LOG_DIR="$HOME/logs/synchronizer"

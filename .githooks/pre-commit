@@ -3,6 +3,10 @@
 # Install: git config core.hooksPath .githooks
 # See: docs/PLATFORM-COMPAT.md
 
+# Windows console codepages (e.g. cp1251) don't cover all chars our python
+# detectors print (×, ✅, emoji); force UTF-8 for every python3 call below.
+export PYTHONIOENCODING=utf-8
+
 ISSUES=0
 
 # === Block secrets file from being committed ===

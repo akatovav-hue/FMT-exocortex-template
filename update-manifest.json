@@ -1164,6 +1164,9 @@
       "path": "roles/strategist/scripts/cleanup-processed-notes.py"
     },
     {
+      "path": "roles/strategist/scripts/cleanup-processed-notes.sh"
+    },
+    {
       "path": "roles/strategist/scripts/fetch-wakatime.sh"
     },
     {
@@ -1240,6 +1243,9 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh"
+    },
+    {
+      "path": "roles/synchronizer/scripts/transcribe.sh"
     },
     {
       "path": "roles/synchronizer/scripts/video-scan.sh"
