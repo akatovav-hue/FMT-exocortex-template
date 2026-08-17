@@ -53,6 +53,20 @@ else
 fi
 CLAUDE_TIMEOUT=1800  # 30 мин — защита от зависания Claude CLI
 
+# Мультивендорность: IWE_STRATEGIST_CLI=claude (default) | kimi
+# kimi — headless Kimi Code CLI (`kimi -p`), claude-имена моделей отбрасываются.
+STRATEGIST_CLI="${IWE_STRATEGIST_CLI:-claude}"
+if [ "$STRATEGIST_CLI" = "kimi" ]; then
+    KIMI_PATH="${KIMI_BIN:-$(command -v kimi 2>/dev/null || true)}"
+    if [ -z "$KIMI_PATH" ] || [ ! -x "$KIMI_PATH" ]; then
+        echo "ERROR: IWE_STRATEGIST_CLI=kimi, но бинарник kimi не найден (PATH или KIMI_BIN)" >&2
+        exit 1
+    fi
+elif [ "$STRATEGIST_CLI" != "claude" ]; then
+    echo "ERROR: неизвестный IWE_STRATEGIST_CLI='$STRATEGIST_CLI' (допустимо: claude, kimi)" >&2
+    exit 1
+fi
+
 # macOS не имеет GNU timeout — используем perl fallback
 if ! command -v timeout &>/dev/null; then
     timeout() {
@@ -167,11 +181,26 @@ ${prompt}"
     fi
     # NB: --dangerously-skip-permissions не используется — Claude Code блокирует флаг
     # под root/sudo (Linux cron). --allowedTools задаёт явный whitelist, чего достаточно.
-    timeout "$CLAUDE_TIMEOUT" "$CLAUDE_PATH" \
-        "${model_args[@]}" \
-        --allowedTools "Read,Write,Edit,Glob,Grep,Bash" \
-        -p "$prompt" \
-        >> "$LOG_FILE" 2>&1 || rc=$?
+    # kimi: claude-имена моделей (sonnet/opus/haiku/claude-*) не поддерживаются —
+    # отбрасываем, действует default_model из ~/.kimi-code/config.toml.
+    # Флаги разрешений не нужны: в headless `-p` kimi не комбинируется с --yolo/--auto
+    # и выполняет инструменты неинтерактивно (проверено на kimi-code 0.36.1).
+    if [ "$STRATEGIST_CLI" = "kimi" ]; then
+        case "${model_override:-}" in
+            ""|sonnet|opus|haiku|claude-*) model_args=() ;;
+        esac
+        log "CLI: kimi ($KIMI_PATH)"
+        timeout "$CLAUDE_TIMEOUT" "$KIMI_PATH" \
+            "${model_args[@]}" \
+            -p "$prompt" \
+            >> "$LOG_FILE" 2>&1 || rc=$?
+    else
+        timeout "$CLAUDE_TIMEOUT" "$CLAUDE_PATH" \
+            "${model_args[@]}" \
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash" \
+            -p "$prompt" \
+            >> "$LOG_FILE" 2>&1 || rc=$?
+    fi
 
     if [ $rc -eq 124 ]; then
         log "WARN: Claude CLI timed out after ${CLAUDE_TIMEOUT}s for scenario: $command_file"
