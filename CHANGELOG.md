@@ -115,6 +115,17 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
+## [0.38.4] — 2026-08-17
+
+### Changed
+
+- `ec3eead` chore: update from upstream template v0.38.4 (extensions/strategy-cycle, DATA-DOMAINS-REGISTRY, guide-kit generator, external-tracker, 42 файла)
+
+### Fixed
+
+- `9819edf` fix(scripts): sync claude-peer-adapter.sh with upstream (update.sh gap, issue #452)
+- feat(strategist): поддержка Kimi CLI через IWE_STRATEGIST_CLI (claude|kimi, default claude); headless `kimi -p`, claude-имена моделей отбрасываются
+
 ## [Unreleased] — обновлено 2026-08-05
 
 ### Added
