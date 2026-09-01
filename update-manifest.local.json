@@ -1,0 +1,7 @@
+{
+  "schema_version": 2,
+  "excluded_paths": [
+    ".githooks/pre-push"
+  ],
+  "notes": "pre-push hook installed by IWE v0.39.1 update; local override for FMT-exocortex-template"
+}
