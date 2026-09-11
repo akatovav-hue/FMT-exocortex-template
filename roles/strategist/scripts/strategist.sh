@@ -125,6 +125,13 @@ notify_telegram() {
     [ -f "$notify_script" ] && "$notify_script" strategist "$scenario" >> "$LOG_FILE" 2>&1 || true
 }
 
+# Windows portability (2026-09-11, IWE scheduler РП): Task Scheduler's Git Bash
+# environment has no `python3` on PATH (only the `python` launcher) — every
+# run_claude call died at the date-context python3 line before invoking the CLI.
+# Resolve once with fallback; use $PY_BIN for all python invocations below.
+PY_BIN="python3"
+command -v "$PY_BIN" >/dev/null 2>&1 || PY_BIN="python"
+
 run_claude() {
     local command_file="$1"
     # Опциональная модель: второй аргумент или IWE_STRATEGIST_MODEL из env.
@@ -155,7 +162,7 @@ run_claude() {
 
     # Inject current date + day of week (prevents LLM calendar arithmetic errors)
     local ru_date_context
-    ru_date_context=$(python3 -c "
+    ru_date_context=$("$PY_BIN" -c "
 import datetime
 days = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье']
 months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
@@ -375,7 +382,7 @@ case "$1" in
 
         # Deterministic cleanup: archive non-bold, non-🔄 notes (safety net for LLM Step 10)
         log "Running deterministic cleanup..."
-        CLEANUP_OUTPUT=$(python3 "$SCRIPT_DIR/cleanup-processed-notes.py" 2>&1) || true
+        CLEANUP_OUTPUT=$("$PY_BIN" "$SCRIPT_DIR/cleanup-processed-notes.py" 2>&1) || true
         log "Cleanup: $CLEANUP_OUTPUT"
 
         # If cleanup made changes, commit and push
@@ -394,7 +401,7 @@ case "$1" in
             if [ -f "$ENV_FILE" ]; then
                 set -a; source "$ENV_FILE"; set +a
                 ALERT_TEXT="⚠️ <b>Note-Review canary</b>: Step 10 не сработал ($BOLD_NEW_BEFORE → $BOLD_NEW_AFTER new bold). Deterministic cleanup applied."
-                ALERT_JSON=$(printf '%s' "$ALERT_TEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+                ALERT_JSON=$(printf '%s' "$ALERT_TEXT" | "$PY_BIN" -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
                 curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
                     -H "Content-Type: application/json" \
                     -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":${ALERT_JSON},\"parse_mode\":\"HTML\"}" >> "$LOG_FILE" 2>&1 || true
