@@ -1,11 +1,12 @@
 # Каталог скриптов IWE
 
-> Автогенерировано `scripts/generate-catalogs.py` · 2026-08-04 · НЕ редактировать вручную.
+> Автогенерировано `scripts/generate-catalogs.py` · 2026-08-10 · НЕ редактировать вручную.
 > Источник: `scripts/*.sh`, `.claude/scripts/*.{sh,py}`. Это вспомогательные скрипты (хелперы, утилиты, серверы), не скиллы.
 
 | Скрипт | Путь | Что делает |
 |--------|------|------------|
 | `active-wp-sweep.sh` | `scripts/active-wp-sweep.sh` | heartbeat sweep активных РП |
+| `add-secret.sh` | `scripts/add-secret.sh` | единый способ сохранить любой API-ключ/токен в ~/.secrets/ |
 | `add-skill-markers.sh` | `scripts/add-skill-markers.sh` | inject empty USER-SPACE block into L1 SKILL.md files that lack it. |
 | `agent-heartbeat.sh` | `scripts/agent-heartbeat.sh` | agent-heartbeat.sh |
 | `agent-status-report.sh` | `scripts/agent-status-report.sh` | РП-395 Ф3 fail-safe writer. |
@@ -65,7 +66,6 @@
 | `kimi-session-watchdog.sh` | `scripts/kimi-session-watchdog.sh` | kimi-session-watchdog.sh |
 | `kimi-standalone-preflight.sh` | `scripts/kimi-standalone-preflight.sh` | kimi-standalone-preflight.sh |
 | `kimi-whisper-safe.sh` | `scripts/kimi-whisper-safe.sh` | безопасная обёртка для whisper с защитой от |
-| `lesson-close.sh` | `scripts/lesson-close.sh` | закрыть занятие в дневном файле (lesson/<date>.md) |
 | `llm-proxy-launcher.sh` | `scripts/llm-proxy-launcher.sh` | обёртка для запуска llm-proxy.py с OpenRouter secrets (WP-366 Ф4.A) |
 | `load-extensions.sh` | `.claude/scripts/load-extensions.sh` | unified loader для suffix extensions (R4.4 fix, WP-273 Этап 2). |
 | `memory-active-wp-update.sh` | `scripts/memory-active-wp-update.sh` | обновление секции «Текущие РП» в MEMORY.md |
@@ -111,5 +111,5 @@
 | `wp-sync-bundle.sh` | `.claude/scripts/wp-sync-bundle.sh` | детерминированный bundler контекста РП для sync-фазы WP Gate |
 | `wp499-agent-coordination-test.sh` | `scripts/wp499-agent-coordination-test.sh` | Воспроизводимый координационный тест N агентов IWE (WP-499 Ф7/Ф11, расширен Ф17 п.3-4, |
 
-_Всего скриптов: 105_
+_Всего скриптов: 106_
 

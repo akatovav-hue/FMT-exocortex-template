@@ -26,6 +26,7 @@ input, nothing written.
 
 import json
 import os
+import re
 import sys
 import tempfile
 
@@ -42,6 +43,101 @@ def union_list(user_items, template_items):
     return user_items + added, len(added), deduped
 
 
+# issue #469: the template moved hook commands from a relative path
+# (".claude/hooks/X.sh") to "$CLAUDE_PROJECT_DIR/.claude/hooks/X.sh" so they
+# resolve correctly from subagents/worktrees/MCP contexts. A plain canonical()
+# comparison treats the old and new form of the same hook as two different
+# entries, so every hook installed before that switch got duplicated on merge.
+_PROJECT_DIR_PREFIX = re.compile(r"^\$\{?CLAUDE_PROJECT_DIR\}?/")
+# A matcher is only compared as a set of OR'd alternatives when it is a flat
+# list of simple tokens — no groups/anchors/escapes, where splitting on "|"
+# could silently change meaning (e.g. "(foo|bar)-baz", "foo\|bar" as a literal
+# pipe). Any matcher outside this shape is left alone: kept as a duplicate
+# entry with an explicit conflict instead of a guessed merge.
+_SIMPLE_OR_MATCHER = re.compile(r"^[A-Za-z0-9_.*]+(\|[A-Za-z0-9_.*]+)*$")
+
+
+def _normalize_command(command):
+    return _PROJECT_DIR_PREFIX.sub("", command.strip()) if isinstance(command, str) else command
+
+
+def _hook_commands_key(entry):
+    """Identity for dedup: the entry's own commands, path-prefix normalized."""
+    inner = entry.get("hooks") if isinstance(entry, dict) else None
+    if not isinstance(inner, list):
+        return canonical(entry)
+    commands = []
+    for hook in inner:
+        if isinstance(hook, dict) and hook.get("type") == "command" and isinstance(hook.get("command"), str):
+            commands.append(_normalize_command(hook["command"]))
+        else:
+            commands.append(canonical(hook))
+    return tuple(sorted(commands))
+
+
+def _matcher_tokens(matcher):
+    if not isinstance(matcher, str) or not _SIMPLE_OR_MATCHER.match(matcher):
+        return None
+    return set(matcher.split("|"))
+
+
+def _reconcile_matcher(merged, idx, template_entry, event, report):
+    """Same command(s) already present under `merged[idx]` — decide whether
+    the template's entry is a true duplicate, a wider matcher to adopt, or
+    a genuine conflict that must keep both entries."""
+    user_entry = merged[idx]
+    user_matcher = user_entry.get("matcher") if isinstance(user_entry, dict) else None
+    template_matcher = template_entry.get("matcher") if isinstance(template_entry, dict) else None
+    if canonical(user_matcher) == canonical(template_matcher):
+        return "deduped"
+    user_tokens = _matcher_tokens(user_matcher)
+    template_tokens = _matcher_tokens(template_matcher)
+    if user_tokens is not None and template_tokens is not None:
+        if template_tokens <= user_tokens:
+            return "deduped"
+        if user_tokens <= template_tokens:
+            merged[idx] = template_entry  # adopt the wider matcher
+            return "deduped"
+    report["conflicts"].append(
+        f"hooks.{event} (same script, different matcher: {user_matcher!r} vs {template_matcher!r})"
+    )
+    return "conflict"
+
+
+def merge_hook_entries(user_entries, template_entries, report, event):
+    merged = list(user_entries)
+    by_key = {}
+    for idx, entry in enumerate(merged):
+        by_key.setdefault(_hook_commands_key(entry), []).append(idx)
+
+    # issue #1089 cold review (Fable, 2026-10-05): count entries the user has
+    # under this event that the CURRENT template doesn't mention at all --
+    # computed from the original user-only by_key, before the loop below
+    # starts appending template-only entries into the same dict. A workspace
+    # entry the template dropped is not an addition and not a value conflict
+    # (both already counted below), so without this it was invisible.
+    template_keys = {_hook_commands_key(te) for te in template_entries}
+    orphaned = sum(len(idxs) for key, idxs in by_key.items() if key not in template_keys)
+
+    added = deduped = 0
+    for template_entry in template_entries:
+        key = _hook_commands_key(template_entry)
+        existing = by_key.get(key)
+        if not existing:
+            by_key.setdefault(key, []).append(len(merged))
+            merged.append(template_entry)
+            added += 1
+            continue
+        outcome = _reconcile_matcher(merged, existing[0], template_entry, event, report)
+        if outcome == "deduped":
+            deduped += 1
+        else:
+            by_key[key].append(len(merged))
+            merged.append(template_entry)
+            added += 1
+    return merged, added, deduped, orphaned
+
+
 def merge_hooks(user_hooks, template_hooks, report):
     merged = dict(user_hooks)
     for event, template_entries in template_hooks.items():
@@ -52,9 +148,16 @@ def merge_hooks(user_hooks, template_hooks, report):
         if not isinstance(user_entries, list):
             report["conflicts"].append(f"hooks.{event}")
             continue
-        merged[event], added, deduped = union_list(user_entries, template_entries)
+        merged[event], added, deduped, orphaned = merge_hook_entries(user_entries, template_entries, report, event)
         report["hooks_added_from_template"] += added
         report["hooks_deduped"] += deduped
+        report["hooks_only_in_workspace"] += orphaned
+    # An event the template dropped ENTIRELY (not just some entries within
+    # it) never enters the loop above, since that loop only walks events the
+    # template still mentions -- count those user events separately.
+    for event, user_entries in user_hooks.items():
+        if event not in template_hooks and isinstance(user_entries, list):
+            report["hooks_only_in_workspace"] += len(user_entries)
     return merged
 
 
@@ -70,6 +173,24 @@ def merge_permissions(user_perms, template_perms, report):
             report["keys_added_from_template"] += 1
         elif canonical(user_value) != canonical(template_value):
             report["conflicts"].append(f"permissions.{key}")
+    return merged
+
+
+def merge_env(user_env, template_env, report):
+    # issue #1216: an env var the template ships (e.g. CLAUDE_CODE_ENABLE_TODO_TOOLS,
+    # needed on models newer than Sonnet 4.6) used to be stuck on "whole-object
+    # conflict" the moment a workspace's env dict wasn't byte-identical to the
+    # template's — the common case, since a workspace settings.json routinely has
+    # its own unrelated env keys. Per-key, same semantics as merge_permissions:
+    # a missing key is added, an existing key with a different value is flagged,
+    # never silently overwritten.
+    merged = dict(user_env)
+    for key, template_value in template_env.items():
+        if key not in merged:
+            merged[key] = template_value
+            report["keys_added_from_template"] += 1
+        elif canonical(merged[key]) != canonical(template_value):
+            report["conflicts"].append(f"env.{key}")
     return merged
 
 
@@ -89,6 +210,13 @@ def merge_settings(template, workspace, report):
                 merged["permissions"] = merge_permissions(user_value, template_value, report)
             else:
                 report["conflicts"].append("permissions")
+            continue
+        if key == "env" and isinstance(template_value, dict):
+            user_value = merged.get("env", {})
+            if isinstance(user_value, dict):
+                merged["env"] = merge_env(user_value, template_value, report)
+            else:
+                report["conflicts"].append("env")
             continue
         if key not in merged:
             merged[key] = template_value
@@ -122,6 +250,7 @@ def main(argv):
         "keys_kept_user_only": 0,
         "hooks_added_from_template": 0,
         "hooks_deduped": 0,
+        "hooks_only_in_workspace": 0,
         "permissions_added_from_template": 0,
         "conflicts": [],
     }

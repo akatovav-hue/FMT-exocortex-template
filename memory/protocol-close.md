@@ -13,7 +13,7 @@ schema_version: 1
 ---
 # Протокол Close (ОРЗ-фрактал)
 
-> **Три масштаба:** Сессия (Quick Close), День (Day Close), Неделя (Week Close).
+> **Четыре масштаба:** Сессия (Quick Close), День (Day Close), Неделя (Week Close), Месяц (Month Close — триггеры и инварианты в `protocol-month-close.md`).
 > **Точка входа:** Вызвать Skill `run-protocol` с нужным аргументом (см. таблицу ниже).
 > **Порядок чтения (WP-484.md:1953, ошибка 28.07):** если разговор перед Close шёл про конкретный РП — прочитать сегодняшние записи его WP-context ПЕРВЫМ действием, только потом открывать сам протокол. Протокол раньше контекста = причина ошибки «принял фразу пилота за отсылку к прошлому решению, не перечитав contextfile».
 > **Принцип:** Quick Close = «не потерять» (inline, без TodoWrite, ~3 мин). Day/Week Close = через SKILL.md + TodoWrite (принудительное исполнение).
@@ -40,14 +40,23 @@ schema_version: 1
 ### Раннер — условный драйвер (WP-482 Ф3+Ф5, issue #356)
 
 ```bash
+# #512: для установки с author_mode: false исход известен заранее — раннер
+# это личный инструмент мейнтейнера (issue #306/#356), в шаблон не поставляется.
+# Ветвление по params.yaml убирает файловую пере-проверку из горячего пути
+# каждого закрытия; file-probe остаётся только когда флаг не читается.
+AUTHOR_MODE=$(grep -E '^author_mode:' "${IWE_WORKSPACE:-$HOME/IWE}/params.yaml" 2>/dev/null | awk '{print $2}')
+if [ "$AUTHOR_MODE" = "false" ]; then
+  echo "Quick Close: author_mode=false — раннер не поставляется, шаги протокола вручную (штатный режим шаблона)"
+else
 RUNNER="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/process-runner.py"
 GRAPH="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/processes/quick-close.yaml"
 if [ -f "$RUNNER" ] && [ -f "$GRAPH" ]; then
-  cd "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}" && \
+  (cd "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}" && \
     python3 scripts/process-runner.py start quick-close --slug <slug сессии> \
-      --input '{"agent":"<agent>","wp":"<WP-N сессии или null, если сессия без своего РП>","slug":"<slug>","session_file":"<путь или null>","repos":["<repo1>", ...]}'
+      --input '{"agent":"<agent>","wp":"<WP-N сессии или null, если сессия без своего РП>","slug":"<slug>","session_file":"<путь или null>","repos":["<repo1>", ...]}')
 else
   echo "Quick Close: раннер не поставляется этой инсталляцией; выполнить шаги протокола вручную"
+fi
 fi
 ```
 
@@ -229,7 +238,7 @@ fi
 
 > **Полная спецификация → `.claude/skills/day-close/SKILL.md` § 6.**
 
-- **WakaTime-источник:** CLI `~/.wakatime/wakatime-cli --today` → если недоступен: Neon `domain_event WHERE event_type='coding_time'` за дату (fallback).
+- **WakaTime-источник:** CLI `~/.wakatime/wakatime-cli --today` (на Windows программа называется `wakatime-cli-windows-amd64.exe`: искать по маске `~/.wakatime/wakatime-cli*`) → если недоступен: Neon `domain_event WHERE event_type='coding_time'` за дату (fallback).
 - **Мультипликатор** = сумма бюджетов закрытых РП за день / WakaTime (сек). Формат: `N.Nx`.
 - **Эмиссия:** после вычисления — `day_close` событие в domain_event, `external_id = "day-close-YYYY-MM-DD"` (ON CONFLICT DO NOTHING — идемпотентно). Payload: `{wakatime_h, multiplier, date, session_id, source}`.
 - **Pending-мультипликатор (если Day Close не успел):** Day Open шаг 1 «Вчера» — при отсутствии записи `day_close` за вчера пересчитать из Neon WakaTime (WakaTime API `summaries?start={вчера}&end={вчера}`).

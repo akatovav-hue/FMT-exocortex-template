@@ -26,7 +26,7 @@ def main() -> int:
     dst = os.environ["DST_DIR"]
     patterns_file = os.environ["AGENTIGORE_FILE"]
 
-    with open(patterns_file) as f:
+    with open(patterns_file, encoding="utf-8") as f:
         patterns = [
             p.strip()
             for p in f.read().splitlines()
@@ -92,6 +92,16 @@ def main() -> int:
             if p.endswith("/**"):
                 prefix = p[:-3]
                 if rel_path == prefix or rel_path.startswith(prefix + os.sep):
+                    return True
+                continue
+            # X/ (trailing slash, no other special markers) — gitignore-style
+            # directory name, matched anywhere in the path (issue #728: a
+            # plain fnmatch never matches "__pycache__/" against a file path,
+            # since no file path ends in "/" — this pattern class never
+            # matched anything before this branch existed).
+            if p.endswith("/"):
+                target = p[:-1]
+                if any(fnmatch.fnmatch(part, target) for part in parts[:-1]):
                     return True
                 continue
             # Plain glob — match relative path or basename

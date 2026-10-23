@@ -9,13 +9,11 @@
 # for two days, one accidental green run, proved that "we run this check
 # somewhere" says nothing about whether THIS commit passed it).
 #
-# publishable=true requires every mandatory check to be success or skipped
-# (skipped = intentionally not run for this trigger, e.g. the macOS
-# integration job on a push event — see validate-template.yml condition on
-# integration-contract-macos). Any failure/cancelled/unknown → false, and
-# the script exits 1 so a future required_status_check can gate on this one
-# job instead of enumerating every individual job (Ф2 acceptance criterion,
-# still deferred by pilot decision as of 18.08).
+# publishable=true requires all three Windows jobs to report success. Other
+# mandatory checks may be intentionally skipped for this trigger (e.g. macOS
+# integration on push). Failure/cancelled/unknown, or a skipped Windows job,
+# produces false. The script exits 1 so branch protection can require this
+# receipt instead of enumerating every individual job (Ф2).
 #
 # Usage (CI): RESULT_<JOB>=<needs.<job>.result> bash scripts/release-receipt.sh
 # Usage (local dry-run): bash scripts/release-receipt.sh — reads "unknown" for
@@ -26,6 +24,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 MANIFEST="$SCRIPT_DIR/update-manifest.json"
 RECEIPT="${RELEASE_RECEIPT_OUT:-$SCRIPT_DIR/release-receipt.json}"
 
@@ -37,7 +37,9 @@ SHA="${RELEASE_RECEIPT_SHA:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
 # published version — reused here, not reimplemented, so the receipt's
 # base_sha always agrees with what upgrade-test actually exercised.
 BASE_SHA="$(git -C "$SCRIPT_DIR" log --format=%H -- "$MANIFEST" | sed -n '2p')"
-MANIFEST_HASH="$(sha256sum "$MANIFEST" | awk '{print $1}')"
+# iwe_sha256 (lib/common.sh): bare sha256sum is GNU-only, no shasum/macOS
+# fallback (issue #1108).
+MANIFEST_HASH="$(iwe_sha256 < "$MANIFEST")"
 GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 # Ordered, not an associative array — JSON key order in the receipt should
@@ -46,21 +48,27 @@ CHECK_NAMES=(
   release-sync
   integration-contract-ubuntu
   integration-contract-macos
+  issue-1030-windows
   shellcheck
   platform-compat
   validate
+  guarded-rm-windows
   upgrade-test
   guide-kit-drift
+  windows-session-guard
 )
 CHECK_ENV_VARS=(
   RESULT_RELEASE_SYNC
   RESULT_INTEGRATION_CONTRACT_UBUNTU
   RESULT_INTEGRATION_CONTRACT_MACOS
+  RESULT_ISSUE_1030_WINDOWS
   RESULT_SHELLCHECK
   RESULT_PLATFORM_COMPAT
   RESULT_VALIDATE
+  RESULT_GUARDED_RM_WINDOWS
   RESULT_UPGRADE_TEST
   RESULT_GUIDE_KIT_DRIFT
+  RESULT_WINDOWS_SESSION_GUARD
 )
 
 PUBLISHABLE=true
@@ -72,7 +80,15 @@ for i in "${!CHECK_NAMES[@]}"; do
   var="${CHECK_ENV_VARS[$i]}"
   result="${!var:-unknown}"
   case "$result" in
-    success | skipped) ;;
+    success) ;;
+    skipped)
+      # These Windows jobs run on every trigger; skipped bypasses their proof.
+      if [ "$name" = issue-1030-windows ] || [ "$name" = guarded-rm-windows ] ||
+         [ "$name" = windows-session-guard ]; then
+        PUBLISHABLE=false
+        FAILED_NAMES+=("$name:$result")
+      fi
+      ;;
     *)
       PUBLISHABLE=false
       FAILED_NAMES+=("$name:$result")
@@ -97,6 +113,6 @@ if [ "$PUBLISHABLE" = "true" ]; then
   echo "PASS: publishable=true — $SHA"
 else
   echo "FAIL: publishable=false — $SHA"
-  echo "  Обязательные проверки без success/skipped: ${FAILED_NAMES[*]}"
+  echo "  Обязательные проверки с недопустимым результатом: ${FAILED_NAMES[*]}"
   exit 1
 fi

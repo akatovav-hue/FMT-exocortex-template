@@ -17,11 +17,21 @@ shopt -s nullglob
 fail=0
 ran=0
 ADDITIONAL_ISSUE_TESTS=(
+    "scripts/tests/test_create_wp_artifactor_gate.sh"
+    "scripts/tests/test_create_wp_contract.sh"
+    "scripts/tests/test_create_wp_hypothesis_relation.sh"
+    "scripts/tests/test_create_wp_registry_coherence.sh"
+    "scripts/tests/test_create_wp_repeat_and_cwd.sh"
+    "scripts/tests/test_create_wp_verification_class.sh"
+    "scripts/tests/test_fresh_seed_reproduction.sh"
     "scripts/tests/test_generate_manifest_registers_setup_exclusions.sh"
     "scripts/tests/test_hindsight_docs_contract.sh"
     "scripts/tests/test_hook_classification.sh"
     "scripts/tests/test_launchd_identity_runtime.sh"
     "scripts/tests/test_update_install_path_guard.sh"
+    "scripts/tests/test_1229_sync_bundle.sh"
+    "scripts/tests/test_1230_publish.sh"
+    "scripts/tests/test_1231_artifactor.sh"
     "scripts/tests/test_update_install_path_guard_provenance.sh"
 )
 

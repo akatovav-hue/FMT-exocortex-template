@@ -1,6 +1,6 @@
 # Каталог скиллов IWE
 
-> Автогенерировано `scripts/generate-catalogs.py` · 2026-08-04 · НЕ редактировать вручную.
+> Автогенерировано `scripts/generate-catalogs.py` · 2026-08-10 · НЕ редактировать вручную.
 > Источник: `.claude/skills/*/SKILL.md`. Скилл вызывается командой `/<id>`.
 
 | Скилл | Что делает |
@@ -29,15 +29,14 @@
 | `/iwe-update` | Update IWE with change explanations. Agent calls update.sh, parses CHANGELOG, explains what changed, helps ad… |
 | `/ke` | Knowledge Extraction — captures and routes knowledge at work boundaries. Use when you discover a pattern, mak… |
 | `/kimi-peer-writer` | Peer-сессия DP.SC.154 где Kimi = писатель, Claude = напарник. Запускается простой фразой. Включает ОРЗ Openin… |
-| `/lesson-close` | Закрыть занятие, открытое скиллом /lesson. Финализирует lesson/YYYY-MM-DD.md (frontmatter status, метаданные… |
 | `/local-llm` | Локальный LLM-стек на Mac (Apple Silicon, MLX) под приватность и запасной режим. NL-вход к установке/запуску/… |
 | `/month-close` | Протокол закрытия месяца (Month Close). Стадия 7 каскада ВДВ v9 (PD.METHOD.008). Запускается в первый Пн меся… |
 | `/org-dev` | Organizational Development Manager (R31): guides the subject from an organizational change request (self/team… |
 | `/pack-creator` | Guide a PACK-X author through the SPF fill cycle 01-11. Calls R28 Diagnostician to select mode (assembly/hybr… |
 | `/pack-new` | Create a new Pack — guided flow through SPF: choose domain, name Pack, scaffold structure, fill roadmap. |
-| `/peer-conversation` | Многотуровый диалог писателя (Claude) с напарником (Kimi по умолчанию, Codex — второй вендор) по задаче пилот… |
+| `/peer-conversation` | Многотуровый диалог писателя (Claude) с одним или несколькими напарниками (любой набор из kimi/codex/hermes/c… |
 | `/personal-guide-render` | Персональное руководство пилота собирается автоматически на сервере платформы по расписанию. Используй когда… |
-| `/personal-guide-start` | Bootstrap wrapper — creates an empty personal-guide repo under the pilot's account (flat name, no login in th… |
+| `/personal-guide-start` | Bootstrap wrapper — creates an empty DS-personal-guide repo under the pilot's account (flat name, no login in… |
 | `/platform-bottleneck` | Скилл IWE — см. тело файла |
 | `/restore-exocortex` | Restore IWE memory from an exocortex backup on a new device or after data loss — NL wrapper around restore-fr… |
 | `/run-protocol` | Step-by-step execution of the OWC protocol with mandatory checkpoint at each step. Prevents skipping steps (i… |
