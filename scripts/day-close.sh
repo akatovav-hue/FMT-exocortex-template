@@ -22,6 +22,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+# bootstrap перезаписывает глобальный SCRIPT_DIR (резолвит свой каталог) — восстанавливаем
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # issue #545: iwe_sessions_dir (резолвер корня журналов по контракту писателя)
 source "$SCRIPT_DIR/lib/common.sh" || {
   echo "FATAL: lib/common.sh not found next to $0 — промотированная копия устарела, обновите её вместе с шаблоном" >&2
