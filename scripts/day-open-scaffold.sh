@@ -106,7 +106,7 @@ fi
 if [ "$MULTIPLIER_ENABLED" = "false" ]; then
   BUDGET_FORMAT_HINT='<!-- PENDING: budget — посчитать после плана; multiplier_enabled: false → только «~Yh РП всего», без физического времени/WakaTime/мультипликатора. -->'
 else
-  BUDGET_FORMAT_HINT='<!-- PENDING: budget — посчитать после плана, формат см. templates-dayplan.md (бюджет РП всего / физ / мультипликатор). -->'
+  BUDGET_FORMAT_HINT='<!-- PENDING: budget — посчитать после плана, формат см. templates-dayplan.md (бюджет РП всего / физ / мультипликатор). СТРОГИЙ формат для pre-commit gate: '"'"'~Xh РП / ~Yh физ / Плановый мультипликатор ~N.Nx'"'"' (латинская '"'"'h'"'"', одно число). -->'
 fi
 SERVER_MODE="${IWE_SERVER_MODE:-0}"  # WP-283: 1 = Linux server, Mac-only MCP недоступен
 

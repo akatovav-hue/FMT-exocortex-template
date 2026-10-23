@@ -3421,6 +3421,8 @@
     "scripts/tests/test_issue_1209_isolate_branch.sh",
     "scripts/tests/test_issue_1213_strategy_day_guard.sh",
     "scripts/tests/test_issue_1279_open_log_isolate.sh",
+    "scripts/tests/test_issue_1280_gate_pending_budget.sh",
+    "scripts/tests/test_issue_1281_telegram_delivery_switch.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

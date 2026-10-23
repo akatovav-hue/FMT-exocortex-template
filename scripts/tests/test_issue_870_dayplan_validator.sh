@@ -83,6 +83,17 @@ OUT=$(run_hook "$WS" 2026-09-18)
 if grep -q 'Бюджет дня не в формате' <<<"$OUT"; then ok "budget line without a number is still rejected"; else bad "validator no longer catches a missing budget number"; fi
 if grep -q 'Мультипликатор не найден' <<<"$OUT"; then ok "missing multiplier is still rejected"; else bad "validator no longer catches a missing multiplier"; fi
 
+# --- 1d. issue #1280: PENDING budget slot (scaffold) → warn, not a format error ---
+WS=$(make_repo pending)
+write_plan "$WS" 2026-09-18 '**Бюджет дня:** <!-- PENDING: budget — посчитать после плана. -->' carry
+OUT=$(run_hook "$WS" 2026-09-18)
+if grep -q 'Бюджет дня не в формате' <<<"$OUT" || grep -q 'Мультипликатор не найден' <<<"$OUT"; then
+    bad "PENDING-бюджет дал ошибку формата"
+else
+    ok "PENDING-бюджет: проверки формата пропущены"
+fi
+if grep -q 'остался PENDING' <<<"$OUT"; then ok "замечание о незаполненном слоте присутствует"; else bad "замечание о незаполненном слоте присутствует: $OUT"; fi
+
 # --- 2a. staging the OLDEST plan while newer ones exist: nothing to compare with ---
 WS=$(make_repo oldest)
 LINE='**Бюджет дня:** ~7h РП / ~9h физ / ~1.0x'
