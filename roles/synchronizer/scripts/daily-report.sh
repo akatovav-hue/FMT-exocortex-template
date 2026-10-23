@@ -80,9 +80,32 @@ check_interval() {
     return 1
 }
 
+# Готовность DayPlan: файл за сегодня есть в current/ И закоммичен в HEAD.
+# Критерий взят из фактов диагноза 2026-10-23: и канонический pipeline
+# (feat(dayplan): …), и фолбэк-сессия CLI (day-plan: … автономный полный)
+# завершаются коммитом файла current/DayPlan $DATE.md; пока файла нет в HEAD —
+# день не открыт. Ночные сетевые фейлы переклассифицируются по этому факту.
+dayplan_ready() {
+    local f="$STRATEGY_DIR/current/DayPlan $DATE.md"
+    [ -f "$f" ] || return 1
+    git -C "$STRATEGY_DIR" cat-file -e "HEAD:current/DayPlan $DATE.md" 2>/dev/null
+}
+
+# Хэш коммита, который добавил сегодняшний DayPlan (для отчёта).
+dayplan_commit() {
+    git -C "$STRATEGY_DIR" log -1 --format=%h -- "current/DayPlan $DATE.md" 2>/dev/null
+}
+
 compute_traffic_light() {
     local color="GREEN"
     local issues=""
+    local recovered=false
+    # Диагноз 2026-10-23: ночные сетевые фейлы (DNS/OAuth 00:00–06:07) сами
+    # восстанавливаются фолбэком к ~09:11. Алертим только если к контрольной
+    # точке (09:30, тик 10:00 — см. scheduler.sh) DayPlan НЕ готов.
+    if (( 10#$HOUR >= 6 )) && ! check_ran "strategist-morning" &>/dev/null && dayplan_ready; then
+        recovered=true
+    fi
 
     if ! check_ran "synchronizer-code-scan" &>/dev/null; then
         color="RED"
@@ -90,13 +113,21 @@ compute_traffic_light() {
     fi
 
     if (( 10#$HOUR >= 6 )) && ! check_ran "strategist-morning" &>/dev/null; then
-        color="RED"
-        issues+="strategist morning не запустился; "
+        if [ "$recovered" = true ]; then
+            issues+="strategist morning восстановлен автоматически — DayPlan $DATE готов и закоммичен ($(dayplan_commit)); ночной сбой не требует действий; "
+        else
+            color="RED"
+            issues+="strategist morning не запустился; "
+        fi
     fi
 
     if [ -f "$SCHEDULER_LOG" ] && grep -q "push failed" "$SCHEDULER_LOG" 2>/dev/null; then
-        if [ "$color" = "GREEN" ]; then color="YELLOW"; fi
-        issues+="push failed (Mac оффлайн?); "
+        if [ "$recovered" = true ]; then
+            issues+="ночные push-failed восстановлены (DayPlan в HEAD); "
+        else
+            if [ "$color" = "GREEN" ]; then color="YELLOW"; fi
+            issues+="push failed (Mac оффлайн?); "
+        fi
     fi
 
     if [ "$DOW" = "1" ] && ! check_ran_week "strategist-week-review" &>/dev/null; then
@@ -163,6 +194,9 @@ agent: Синхронизатор
     if sm_time=$(check_ran "strategist-morning"); then
         report+="
 | 2 | Стратег утренний | **✅** | $sm_time |"
+    elif dayplan_ready; then
+        report+="
+| 2 | Стратег утренний | **✅** (день открыт фолбэком/поздним тиком) | DayPlan $(dayplan_commit) |"
     else
         report+="
 | 2 | Стратег утренний | **❌** | — |"
@@ -203,6 +237,27 @@ agent: Синхронизатор
     local warnings=""
     if [ -f "$SCHEDULER_LOG" ]; then
         warnings=$(grep -E "WARN:|ERROR:|failed" "$SCHEDULER_LOG" 2>/dev/null | sed 's/^/- /' || true)
+    fi
+
+    # Переклассификация ночных фейлов (диагноз 2026-10-23): если DayPlan готов
+    # и закоммичен — сетевые сбои strategist morning / note-review / push за
+    # ночь восстановлены автоматически: это инфо-строки, не WARN. Если DayPlan
+    # не готов — всё остаётся WARN/🔴, как раньше.
+    local recovered_notes=""
+    if dayplan_ready && [ -n "$warnings" ]; then
+        recovered_notes=$(printf '%s\n' "$warnings" \
+            | grep -E "strategist morning failed|strategist note-review.*failed|Day Open pipeline unavailable/failed|scenario: (day-plan|note-review)|pull --rebase failed|git push failed|WARN: push failed" \
+            || true)
+        warnings=$(printf '%s\n' "$warnings" \
+            | grep -vE "strategist morning failed|strategist note-review.*failed|Day Open pipeline unavailable/failed|scenario: (day-plan|note-review)|pull --rebase failed|git push failed|WARN: push failed" \
+            || true)
+    fi
+
+    if [ -n "$recovered_notes" ]; then
+        report+="
+Восстановлено автоматически — DayPlan $DATE готов (коммит $(dayplan_commit)), ночные сетевые сбои не требуют действий:
+$recovered_notes
+"
     fi
 
     if [ -n "$warnings" ]; then

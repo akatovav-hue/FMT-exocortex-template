@@ -355,11 +355,25 @@ dispatch() {
     fi
 
     # --- Синхронизатор: daily-report (после code-scan и strategist morning) ---
+    # Диагноз 2026-10-23: отчёт раньше ставил 🔴 «strategist morning failed»
+    # на весь день, хотя фолбэк открывал день к ~09:11. Поэтому, пока morning
+    # не отметился И день не открыт (нет закоммиченного DayPlan), отчёт
+    # перегенерируется на каждом тике; финальный статус фиксируется на тике
+    # 10:00 — после контрольной точки 09:30. DayPlan-ready проверяется так же,
+    # как в daily-report.sh: файл в current/ и в HEAD governance-репо.
     if ! ran_today "synchronizer-daily-report"; then
         if ran_today "strategist-morning" || (( 10#$HOUR >= 6 )); then
             log "→ synchronizer daily-report (hour=$HOUR)"
             if timeout "$TASK_TIMEOUT_SHORT" "$SCRIPT_DIR/daily-report.sh" >> "$LOG_FILE" 2>&1; then
                 mark_done "synchronizer-daily-report"
+                if ! ran_today "strategist-morning" && (( 10#$HOUR < 10 )); then
+                    local gov="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+                    if [ ! -f "$gov/current/DayPlan $DATE.md" ] \
+                       || ! git -C "$gov" cat-file -e "HEAD:current/DayPlan $DATE.md" 2>/dev/null; then
+                        rm -f "$STATE_DIR/synchronizer-daily-report-$DATE"
+                        log "daily-report: morning не отработал и DayPlan не готов — отчёт обновится на следующем тике"
+                    fi
+                fi
             else
                 log "WARN: daily-report failed (will retry next dispatch)"
             fi
