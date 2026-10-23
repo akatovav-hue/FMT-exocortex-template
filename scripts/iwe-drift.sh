@@ -274,7 +274,10 @@ collect() {
                         *) script_status="missing" ;;
                     esac
                 fi
-                printf "%s\t%s\t%s\t%s\t%s\t%s\n" "?" "$id" "$relation" "$script_status" "$owner" "$symptom"
+                # exit 0 = drift'а нет → lag 0; иначе lag не вычисляется из mtime — "?".
+                local lag="?"
+                [ "$script_status" = "ok" ] && lag="0"
+                printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$lag" "$id" "$relation" "$script_status" "$owner" "$symptom"
                 continue
                 ;;
         esac

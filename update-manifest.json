@@ -3504,6 +3504,7 @@
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issue_wp516_verify_skill.py",
+    "scripts/tests/test_issue_wp267_status_legend_marker.sh",
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
     "scripts/tests/test_manifest_coverage_local.py",

@@ -6,12 +6,14 @@
 # Что проверяет (3 invariant'а):
 #   I1. **Legend completeness:** все статус-эмодзи, встречающиеся в таблице WP-REGISTRY.md,
 #       задокументированы в легенде вверху файла. Новый эмодзи без записи в легенде → DRIFT.
-#   I2. **Format compliance — active id:** строки с plain id `| <num> |` имеют active статус
+#   I2. **Format compliance — active row:** строки, где НЕТ закрывающего зачёркивания
+#       (ни `~~#~~`, ни `~~название~~`), имеют active статус
 #       (НЕ из терминального множества {✅, 📦, ↗️, ❌}).
-#   I3. **Format compliance — terminal id:** строки с crossed id `| ~~<num>~~ |` имеют
+#   I3. **Format compliance — terminal row:** строки с крестом (id `~~<num>~~` или
+#       зачёркнутое название — done-no-strike допустим в реестре) имеют
 #       терминальный статус из {✅, 📦, ↗️, ❌}.
 #
-# I2 + I3 — invariant id-format ↔ status (см. .claude/rules/formatting.md «Таблицы с РП»).
+# I2 + I3 — invariant row-format ↔ status (см. .claude/rules/formatting.md «Таблицы с РП»).
 # Сломан = расхождение row-format и status, что ломает счётчики (linear-sync.sh, day-close.sh).
 #
 # Usage:
@@ -19,8 +21,8 @@
 #   bash check-status-legend.sh --critical-only # только нарушения
 #   IWE_ROOT=/path bash check-status-legend.sh
 #
-# Не зависит от iwe-drift.sh — может быть запущен отдельно. Когда iwe-drift.sh научится
-# диспатчить `check: script:...` пары, он будет вызывать этот скрипт автоматически.
+# Не зависит от iwe-drift.sh — может быть запущен отдельно. iwe-drift.sh диспатчит
+# `check: script:...` пары через эту пару манифеста автоматически (issues #220, #259).
 
 set -eu
 
@@ -64,6 +66,10 @@ extract_legend_emojis() {
         /^\|/ {
             n = split($0, fields, "|")
             if (in_legend == 0) {
+                # Сброс на КАЖДОЙ новой таблице: иначе emoji_col от легенды «Статус»
+                # протекает в чужие таблицы (Quick links, «Полный реестр») и они
+                # считаются продолжением легенды → мусор в легенде и ложные I1-пропуски.
+                emoji_col = 0; status_col = 0; has_description = 0
                 for (i = 2; i < n; i++) {
                     header = trim(fields[i])
                     if (header == "Эмодзи") emoji_col = i
@@ -86,7 +92,10 @@ extract_legend_emojis() {
             }
             next
         }
-        in_legend && /^[^|]/ { in_legend = 0 }
+        # Любая строка без «|» — включая ПУСТУЮ — заканчивает таблицу легенды
+        # (пустая строка не матчит /[^|]/: без этого сброса следующая таблица
+        # файла протекала в легенду).
+        in_legend && !/^\|/ { in_legend = 0 }
     ' "$REGISTRY"
 }
 
@@ -118,14 +127,18 @@ extract_table_emojis() {
             if (status_col > 0 && n >= status_col) {
                 status = trim(fields[status_col])
                 gsub(/~~/, "", status)
+                # Ячейки содержательные («✅ done (23.10, W44)», «🔄 in_progress (...)») —
+                # сравниваем с легендой ВЕДУЩИЙ эмодзи-маркер (первый токен), не всю ячейку.
+                sub(/[[:space:]].*$/, "", status)
                 if (status != "") print status
             }
         }
     ' "$REGISTRY"
 }
 
-# Извлечь пары (id_format, status) для format compliance check.
-# id_format: "active" если plain `| 263 |`, "terminal" если crossed `| ~~263~~ |`.
+# Извлечь тройки (id, row_format, status_marker) для format compliance check.
+# row_format: "terminal" если crossed id `| ~~263~~ |` ИЛИ зачёркнуто название
+# (done-no-strike); "active" если нет ни того, ни другого.
 extract_id_status_pairs() {
     awk '
         function trim(value) {
@@ -149,18 +162,29 @@ extract_id_status_pairs() {
             n = split($0, fields, "|")
             if (status_col == 0 || n < status_col) next
             id_field = fields[2]
+            name_field = fields[3]
             status_field = fields[status_col]
             id_field = trim(id_field)
+            name_field = trim(name_field)
             status_field = trim(status_field)
             gsub(/~~/, "", status_field)
+            # Маркер — ведущий токен содержательной ячейки (см. extract_table_emojis).
+            sub(/[[:space:]].*$/, "", status_field)
 
             if (match(id_field, /^~~[0-9]+~~$/)) {
                 id_format = "terminal"
                 gsub(/~~/, "", id_field)
             } else if (match(id_field, /^[0-9]+$/)) {
-                id_format = "active"
+                # done-no-strike: id без креста допустим, но тогда закрытие показывает
+                # зачёркнутое НАЗВАНИЕ (конвенция живого реестра; wp-sync-bundle.sh
+                # трактует ~~ где угодно в строке как closed — issue #714).
+                if (name_field ~ /~~/) {
+                    id_format = "terminal"
+                } else {
+                    id_format = "active"
+                }
             } else {
-                next  # некорректный формат, пропускаем
+                next  # некорректный формат (например «113 (II)»), пропускаем
             }
 
             print id_field "\t" id_format "\t" status_field
@@ -188,10 +212,17 @@ trap 'rm -f "$TMP_LEGEND" "$TMP_TABLE" "$TMP_VIOLATIONS"' EXIT
 extract_legend_emojis > "$TMP_LEGEND"
 extract_table_emojis | sort -u > "$TMP_TABLE"
 
+# Точное сравнение «строка == эмодзи» в файле. НЕ grep -x: MSYS-grep под
+# LC_ALL=*.UTF-8 неверно считает длину 4-байтовых эмодзи (📦 🔄 🟡) для якоря
+# -x и матч ломается; сравнение строк в awk байтовое и локали не зависит.
+legend_contains() {
+    awk -v needle="$1" '$0 == needle { found=1; exit } END { exit !found }' "$TMP_LEGEND"
+}
+
 undocumented_count=0
 while IFS= read -r emoji; do
     [ -z "$emoji" ] && continue
-    if ! grep -qxF "$emoji" "$TMP_LEGEND"; then
+    if ! legend_contains "$emoji"; then
         printf "| I1 | undocumented-status | %s | Эмодзи встречается в таблице, но отсутствует в легенде |\n" "$emoji" >> "$TMP_VIOLATIONS"
         undocumented_count=$((undocumented_count + 1))
     fi
@@ -203,17 +234,17 @@ ok_count=0
 while IFS=$'\t' read -r wp_id id_format status; do
     [ -z "$wp_id" ] && continue
     if [ "$id_format" = "active" ]; then
-        # active id → status НЕ должен быть terminal
+        # active row → status НЕ должен быть terminal
         if is_terminal_status "$status"; then
-            printf "| I2 | active-id-with-terminal-status | WP-%s | id=plain но status=%s (terminal). Должно быть ~~%s~~ |\n" "$wp_id" "$status" "$wp_id" >> "$TMP_VIOLATIONS"
+            printf "| I2 | active-row-with-terminal-status | WP-%s | строка без зачёркивания, но status=%s (terminal). Зачеркнуть id/название или сменить статус |\n" "$wp_id" "$status" >> "$TMP_VIOLATIONS"
             mismatch_count=$((mismatch_count + 1))
         else
             ok_count=$((ok_count + 1))
         fi
     elif [ "$id_format" = "terminal" ]; then
-        # terminal id → status ДОЛЖЕН быть terminal
+        # terminal row → status ДОЛЖЕН быть terminal
         if ! is_terminal_status "$status"; then
-            printf "| I3 | terminal-id-with-active-status | WP-%s | id=~~%s~~ но status=%s (active). Раскрестить или сменить статус |\n" "$wp_id" "$wp_id" "$status" >> "$TMP_VIOLATIONS"
+            printf "| I3 | terminal-row-with-active-status | WP-%s | id/название зачёркнуты, но status=%s (active). Раскрестить или сменить статус |\n" "$wp_id" "$status" >> "$TMP_VIOLATIONS"
             mismatch_count=$((mismatch_count + 1))
         else
             ok_count=$((ok_count + 1))
