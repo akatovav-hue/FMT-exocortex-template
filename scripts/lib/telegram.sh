@@ -6,6 +6,26 @@
 
 TG_SECRETS_FILE="${TG_SECRETS_FILE:-$HOME/.secrets/tg-bots}"
 
+# === Выключатель доставки (IWE scheduler, диагноз 2026-10-23) ===
+# По умолчанию доставка ОТКЛЮЧЕНА: TG-уведомления пилотом не настраивались, а
+# ночные попытки отправки (network-wait + 3 curl-retry на каждое уведомление)
+# при падении DNS давали чистый FAIL-шум в логах scheduler'а. Отправка
+# пропускается молча-однострочно, код доставки не удалён.
+# Включить обратно: в конфиге
+#   ${IWE_TELEGRAM_CONFIG:-${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime/roles/synchronizer/config.yaml}
+# установить notify.channels.telegram.enabled: true и задать TELEGRAM_BOT_TOKEN
+# + TELEGRAM_CHAT_ID (env_file в том же блоке конфига).
+telegram_delivery_enabled() {
+    local cfg="${IWE_TELEGRAM_CONFIG:-${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime/roles/synchronizer/config.yaml}"
+    [ -f "$cfg" ] || return 1
+    awk '
+        /^[[:space:]]*telegram:/ { in_tg=1; tg_indent=match($0, /[^ ]/); next }
+        in_tg && match($0, /[^ ]/) && RSTART <= tg_indent { in_tg=0 }
+        in_tg && $0 ~ /^[[:space:]]*enabled:[[:space:]]*true([[:space:]]*(#.*)?)$/ { found=1 }
+        END { exit(found ? 0 : 1) }
+    ' "$cfg"
+}
+
 # shellcheck source=/dev/null
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/network-wait.sh"
 # shellcheck source=/dev/null
@@ -72,6 +92,11 @@ telegram_send() {
 telegram_send_impl() {
     local text="$1"
     local parse_mode="${2:-}"
+
+    if ! telegram_delivery_enabled; then
+        echo "[telegram] доставка отключена конфигом (notify.channels.telegram.enabled != true) — пропуск без отправки" >&2
+        return 0
+    fi
 
     telegram_load_creds || return 1
 
@@ -160,6 +185,11 @@ telegram_send_and_get_id() {
 telegram_send_and_get_id_impl() {
     local text="$1"
     local parse_mode="${2:-}"
+
+    if ! telegram_delivery_enabled; then
+        echo "[telegram] доставка отключена конфигом (notify.channels.telegram.enabled != true) — пропуск без отправки" >&2
+        return 1
+    fi
 
     telegram_load_creds || return 1
     network_wait api.telegram.org 45 || true

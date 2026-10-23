@@ -37,4 +37,10 @@ schedules:
 notify:
   channels:
     telegram:
+      # Доставка ВЫКЛЮЧЕНА по умолчанию (IWE scheduler 2026-10-23): пилот токен/чат
+      # не настраивал, ночные попытки отправки при падении DNS давали FAIL-шум в
+      # логах. Чтобы включить: enabled: true + реальные TELEGRAM_BOT_TOKEN /
+      # TELEGRAM_CHAT_ID в env_file ниже. Код доставки (scripts/lib/telegram.sh)
+      # не удалён и читает именно этот флаг.
+      enabled: false
       env_file: "~/.config/aist/env"  # TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
