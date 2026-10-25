@@ -1,7 +1,10 @@
 {
   "schema_version": 2,
   "excluded_paths": [
-    ".githooks/pre-push"
+    ".githooks/pre-push",
+    "docs/adr/ADR-003-template-sync.md",
+    "roles/strategist/scripts/cleanup-processed-notes.sh",
+    "roles/synchronizer/scripts/transcribe.sh"
   ],
   "notes": "pre-push hook installed by IWE v0.39.1 update; local override for FMT-exocortex-template"
 }
