@@ -106,9 +106,14 @@ defer_until: "после WP-245 Ф22"     # ОБЯЗАТЕЛЬНО — дата 
 ### Шаг 1. Найти незавершённые отчёты
 
 ```bash
-GOV_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
-bash "$GOV_DIR/scripts/ke-queue-stats.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --list
+IWE_ROOT="${IWE_WORKSPACE:-$HOME/IWE}"
+GOV_DIR="$IWE_ROOT/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+SCRIPTS_DIR="${IWE_TEMPLATE_DIR:-$IWE_ROOT/FMT-exocortex-template}/scripts"
+bash "$SCRIPTS_DIR/ke-queue-stats.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --list
 ```
+
+Скрипты reader'а и реконсилера поставляются шаблоном и НЕ копируются в governance-репо —
+используй `$SCRIPTS_DIR` (переопределяется переменной окружения `IWE_TEMPLATE_DIR`).
 
 Если `$ARGUMENTS` задан путь — работать только с ним.
 Читатель ничего не изменяет и не обращается к Git или сети. Он одинаково учитывает
@@ -415,9 +420,11 @@ SHA, а не SHA до переноса коммита, и `blob` из `git rev-p
 Статус и служебную проекцию меняет только реконсилер, адресно по выбранному отчёту:
 
 ```bash
-bash "$GOV_DIR/scripts/ke-report-reconcile.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --report "<имя отчёта>.md" --dry-run
-bash "$GOV_DIR/scripts/ke-report-reconcile.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --report "<имя отчёта>.md"
+bash "$SCRIPTS_DIR/ke-report-reconcile.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --report "<имя отчёта>.md" --dry-run
+bash "$SCRIPTS_DIR/ke-report-reconcile.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --report "<имя отчёта>.md"
 ```
+
+`$SCRIPTS_DIR` определён на Шаге 1.
 
 `--report` можно повторить. Запись всей очереди требует отдельного явного `--all`;
 вызов без области записи отказывает. `--dry-run` ничего не записывает. Вывод JSON
