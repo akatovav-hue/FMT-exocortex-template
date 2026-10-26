@@ -846,8 +846,18 @@ commit_extractor_changes() {
     if [ "$commit_mode" = "isolated-feed" ]; then
         commit_message="feed(${EXTRACTOR_FEED_LABEL:-feed}): capture candidates $DATE"
     fi
+    # Атрибуция: содержимое коммита пишет AI CLI ($AI_CLI), сам коммит делает
+    # скрипт — по конвенции пилота трейлер несёт участвовавший агент (26.10).
+    local ai_trailer=""
+    case "$(basename "$AI_CLI")" in
+        kimi*)    ai_trailer="Co-Authored-By: Kimi <noreply@moonshot.ai>" ;;
+        claude*)  ai_trailer="Co-Authored-By: Claude <noreply@anthropic.com>" ;;
+        codex*)   ai_trailer="Co-Authored-By: Codex <noreply@openai.com>" ;;
+    esac
+    local trailer_args=()
+    [ -n "$ai_trailer" ] && trailer_args=(--trailer "$ai_trailer")
     if ! git -C "$strategy_dir" commit --only \
-        -m "$commit_message" -- \
+        -m "$commit_message" "${trailer_args[@]}" -- \
         "${target_paths[@]}" >> "$LOG_FILE" 2>&1; then
         log "WARN: git commit failed for $repo_name"
         EXTRACTOR_COMMIT_RESULT="failed"
