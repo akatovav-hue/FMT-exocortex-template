@@ -76,6 +76,20 @@ fi
 
 command -v psql >/dev/null 2>&1 || fail "psql not installed"
 
+# Windows-порт (29.10.2026, найдено вживую): psql.exe получает аргументы командной
+# строки в ANSI-кодовой странице системы, а Git Bash передаёт UTF-8 — кириллица в
+# -v-переменных превращалась в битые литералы, UPSERT молча не проходил (fail-safe
+# глотал ошибку, регистр недописывался). Перекодировка UTF-8 → ANSI не подходит:
+# на машинах с западной системной локалью ANSI = CP1252, куда кириллица не влезает.
+# Решение: свободные текстовые значения встраиваем в SQL-heredoc как литералы
+# (stdin байт-прозрачен) + PGCLIENTENCODING=UTF8; agent/status/session_id —
+# ASCII-безопасны, остаются в -v. Эскейпинг \ $ ` и удвоение ' обязательны именно
+# в этом порядке (сначала backslash), иначе незаквоченный heredoc исполнит
+# подстановки из пользовательского текста.
+export PGCLIENTENCODING=UTF8
+TK_SQL=${TASK//\\/\\\\}; TK_SQL=${TK_SQL//\$/\\\$}; TK_SQL=${TK_SQL//\`/\\\`}; TK_SQL=${TK_SQL//\'/\'\'}
+FL_SQL=${FILES_CSV//\\/\\\\}; FL_SQL=${FL_SQL//\$/\\\$}; FL_SQL=${FL_SQL//\`/\\\`}; FL_SQL=${FL_SQL//\'/\'\'}
+
 # === GC mode: one-time stale cleanup (client-side fallback until server-side GC) ===
 if [ -n "$GC_MODE" ]; then
   psql "$INDICATORS_URL" -v ON_ERROR_STOP=1 -v uid="$USER_ID" \
@@ -99,19 +113,20 @@ SQL
   exit 0
 fi
 
-# UPSERT (зеркалит gateway-mcp/src/agent-status.ts). psql :'var' квотирование = защита от инъекций.
+# UPSERT (зеркалит gateway-mcp/src/agent-status.ts). uid/ag/st/sid — через -v (psql
+# :'var' квотирование = защита от инъекций); task/files — литералы heredoc, см. выше.
 # files: CSV → text[] через string_to_array; пустое → '{}'.
 psql "$INDICATORS_URL" -v ON_ERROR_STOP=1 \
-  -v uid="$USER_ID" -v ag="$AGENT" -v st="$STATUS" -v tk="$TASK" -v fl="$FILES_CSV" -v sid="$SESSION_ID" \
-  >/dev/null 2>&1 <<'SQL' || fail "db write failed"
+  -v uid="$USER_ID" -v ag="$AGENT" -v st="$STATUS" -v sid="$SESSION_ID" \
+  >/dev/null 2>&1 <<SQL || fail "db write failed"
 INSERT INTO agent_status (user_id, agent, session_id, status, task, files, updated_at)
 VALUES (
   :'uid'::uuid,
   :'ag',
   :'sid',
   :'st',
-  NULLIF(:'tk', ''),
-  CASE WHEN :'fl' = '' THEN '{}'::text[] ELSE string_to_array(:'fl', ',') END,
+  NULLIF('$TK_SQL', ''),
+  CASE WHEN '$FL_SQL' = '' THEN '{}'::text[] ELSE string_to_array('$FL_SQL', ',') END,
   now()
 )
 ON CONFLICT (user_id, agent, session_id) DO UPDATE SET
