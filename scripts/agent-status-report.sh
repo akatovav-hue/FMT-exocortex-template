@@ -116,9 +116,14 @@ fi
 # UPSERT (зеркалит gateway-mcp/src/agent-status.ts). uid/ag/st/sid — через -v (psql
 # :'var' квотирование = защита от инъекций); task/files — литералы heredoc, см. выше.
 # files: CSV → text[] через string_to_array; пустое → '{}'.
-psql "$INDICATORS_URL" -v ON_ERROR_STOP=1 \
-  -v uid="$USER_ID" -v ag="$AGENT" -v st="$STATUS" -v sid="$SESSION_ID" \
-  >/dev/null 2>&1 <<SQL || fail "db write failed"
+# Neon free засыпает при простое: первая попытка может упасть на холодном пулере,
+# вторая (после паузы 3с — база успевает проснуться) проходит. Ошибку глотаем только
+# после исчерпания попыток.
+_rc=1
+for _attempt in 1 2; do
+  if psql "$INDICATORS_URL" -v ON_ERROR_STOP=1 \
+    -v uid="$USER_ID" -v ag="$AGENT" -v st="$STATUS" -v sid="$SESSION_ID" \
+    >/dev/null 2>&1 <<SQL; then _rc=0; break; fi
 INSERT INTO agent_status (user_id, agent, session_id, status, task, files, updated_at)
 VALUES (
   :'uid'::uuid,
@@ -135,5 +140,8 @@ ON CONFLICT (user_id, agent, session_id) DO UPDATE SET
   files = EXCLUDED.files,
   updated_at = now();
 SQL
+  sleep 3
+done
+[ "$_rc" -ne 0 ] && fail "db write failed"
 
 exit 0
