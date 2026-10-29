@@ -1431,10 +1431,41 @@ if [ "$FORCE" != "true" ]; then
         if [ -z "$PLAN_EVER" ] && [ ! -f "$DS_STRATEGY/current/DayPlan $YDAY.md" ]; then
           echo "  No DayPlan for $YDAY ever existed (HEAD/origin, both locations; nothing to archive) — proceeding."
         else
-          echo "  Day Close for $YDAY not done yet (no archived DayPlan) — deferring Day Open (will regenerate after close)."
-          tg_notify "⏸ Day Open $DATE отложен: закрытие $YDAY ещё не долетело до сервера (гонка расписаний, не поломка). Пересоберётся автоматически после закрытия (или запусти с --force)." terminal
-          # Ф32 п.11 (WP-484, 31.07): deferred ≠ done — exit 7, scheduler retries next tick.
-          exit 7
+          # Host self-heal (2026-09-11, IWE scheduler РП; перенесено из форка
+          # governance-репо 29.10.2026): на хосте без вечернего Day Close (вечерний
+          # сценарий — только note-review) сиротский план в current/ ждал бы архивации
+          # вечно. Зеркало шага 10c закрытия дня: автоархивация того же
+          # детерминированного сигнала (архивный DayPlan в git); ошибка архивации
+          # оставляет откладывание.
+          if [ -f "$DS_STRATEGY/current/DayPlan $YDAY.md" ]; then
+            case "$(uname -s)" in
+              MINGW*|MSYS*|CYGWIN*)
+                echo "  No Day Close flow on this host — auto-archiving orphan DayPlan $YDAY (current/ -> archive/day-plans/)."
+                (
+                  cd "$DS_STRATEGY" || exit 1
+                  if git ls-files --error-unmatch "current/DayPlan $YDAY.md" >/dev/null 2>&1; then
+                    git mv "current/DayPlan $YDAY.md" "archive/day-plans/DayPlan $YDAY.md" || exit 1
+                  else
+                    mv "current/DayPlan $YDAY.md" "archive/day-plans/DayPlan $YDAY.md" || exit 1
+                    git add "archive/day-plans/DayPlan $YDAY.md" || exit 1
+                  fi
+                  git commit -q -m "day-close: auto-archive DayPlan $YDAY (host without close flow)" || exit 1
+                  git push -q 2>/dev/null || true
+                ) && DC_DONE=yes
+                if [ -n "$DC_DONE" ]; then
+                  echo "  Auto-archived orphan DayPlan $YDAY — proceeding."
+                else
+                  echo "  WARN: auto-archive of DayPlan $YDAY failed — keeping defer."
+                fi
+                ;;
+            esac
+          fi
+          if [ -z "$DC_DONE" ]; then
+            echo "  Day Close for $YDAY not done yet (no archived DayPlan) — deferring Day Open (will regenerate after close)."
+            tg_notify "⏸ Day Open $DATE отложен: закрытие $YDAY ещё не долетело до сервера (гонка расписаний, не поломка). Пересоберётся автоматически после закрытия (или запусти с --force)." terminal
+            # Ф32 п.11 (WP-484, 31.07): deferred ≠ done — exit 7, scheduler retries next tick.
+            exit 7
+          fi
         fi
       fi
       if [ -n "$DC_DONE" ]; then
