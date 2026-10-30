@@ -1605,10 +1605,15 @@ case "$1" in
             # (already in that old plist's environment) as a last resort,
             # same priority order as the two paths above (IWE_SCRIPTS still
             # wins, then the workspace-root legacy copy, only then this).
-            if [ -z "${IWE_SCRIPTS:-}" ] && [ ! -f "$DAY_OPEN_PIPELINE" ] && [ -n "${IWE_TEMPLATE:-}" ]; then
+            # 30.10.2026: условие расширено с «IWE_SCRIPTS не задан» на «pipeline
+            # всё ещё не найден» — env-файл агентского CLI (~/.iwe-agent-cli.env)
+            # может ПЕРЕОПРЕДЕЛЯТЬ IWE_SCRIPTS устаревшим путём (костыль рабочего
+            # session-guard на Git Bash), и тогда этот fallback молча не срабатывал
+            # (morning ALARM day-open-failed, найдено на инсталляции пилота).
+            if [ ! -f "$DAY_OPEN_PIPELINE" ] && [ -n "${IWE_TEMPLATE:-}" ]; then
                 FALLBACK_PIPELINE="$IWE_TEMPLATE/scripts/day-open-pipeline.sh"
                 if [ -f "$FALLBACK_PIPELINE" ]; then
-                    log "WARN: \$IWE_SCRIPTS not set and \$WORKSPACE/scripts/day-open-pipeline.sh missing — falling back to \$IWE_TEMPLATE/scripts (запущено из устаревшего plist, переустановите роль: bash \$IWE_TEMPLATE/roles/synchronizer/install.sh)"
+                    log "WARN: day-open-pipeline.sh не найден ни в \$IWE_SCRIPTS (=${IWE_SCRIPTS:-пусто}), ни в \$WORKSPACE/scripts — falling back to \$IWE_TEMPLATE/scripts (причина: устаревший env/plist — переустановите роль: bash \$IWE_TEMPLATE/roles/synchronizer/install.sh)"
                     DAY_OPEN_PIPELINE="$FALLBACK_PIPELINE"
                 fi
             fi
