@@ -34,7 +34,7 @@ for f in "${HOT_FILES[@]}"; do
   fi
 done
 
-# Real bytes/token ratio if calibrated (scripts/calibrate-median-ratio.py), else placeholder /5.
+# Real bytes/token ratio if calibrated (scripts/median-ratio.conf), else placeholder /5.
 MEDIAN_RATIO_CONF="$SCRIPT_DIR/median-ratio.conf"
 CALIBRATED=false
 if [ -f "$MEDIAN_RATIO_CONF" ]; then
@@ -53,7 +53,7 @@ echo "Total bytes: $TOTAL_BYTES"
 if [ "$CALIBRATED" = true ]; then
   echo "Est. tokens: ~$TOTAL_TOKENS (@ ${MEDIAN_RATIO} bytes/token, calibrated — see median-ratio.conf)"
 else
-  echo "Est. tokens: ~$TOTAL_TOKENS (@ 5 bytes/token placeholder, NOT calibrated — run scripts/calibrate-median-ratio.py)"
+  echo "Est. tokens: ~$TOTAL_TOKENS (@ 5 bytes/token placeholder, NOT calibrated — populate scripts/median-ratio.conf with MEDIAN_RATIO)"
 fi
 echo ""
 
@@ -78,7 +78,7 @@ if [ "$CALIBRATED" = true ]; then
     PASS=false
   fi
 else
-  echo "⏭️  M2 SKIPPED: not calibrated (run scripts/calibrate-median-ratio.py with ANTHROPIC_API_KEY)"
+  echo "⏭️  M2 SKIPPED: not calibrated (no scripts/median-ratio.conf — set MEDIAN_RATIO there to enable M2; WP-312: calibrate-median-ratio.py never shipped, calibrate externally via count_tokens)"
 fi
 
 # HOT line-count check on distinctions.md (≤150 lines per WP-7 NR1.2)
