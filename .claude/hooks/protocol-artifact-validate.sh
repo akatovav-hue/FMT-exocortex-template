@@ -120,7 +120,6 @@ DAYPLAN=""
 [ -n "$DAYPLAN_STAGED" ] && DAYPLAN="$GOV_PATH/$DAYPLAN_STAGED"
 MISSING=()
 ERRORS=()
-WARNINGS=()
 
 if [ -n "$DAYPLAN" ] && [ -f "$DAYPLAN" ]; then
 
@@ -178,16 +177,7 @@ fi
 # настроен") — такое же честное состояние поля, как и само число.
 # issue #870: дробная часть — точка ИЛИ запятая (русский Day Open пишет «~1,2x»).
 # Число только проверяется на формат (grep), в вычислениях не участвует.
-# issue #1280: «Бюджет дня» в статусе PENDING (scaffold не заполнил слот) — warn,
-# не block; заполненное-не-в-формате блокируется ниже, как и раньше.
-BUDGET_LINE=$(grep -m1 'Бюджет дня' "$DAYPLAN" 2>/dev/null || true)
-BUDGET_PENDING=false
-if [ -n "$BUDGET_LINE" ] && printf '%s' "$BUDGET_LINE" | grep -q "PENDING"; then
-  BUDGET_PENDING=true
-  WARNINGS+=("«Бюджет дня» остался PENDING — слот не заполнен (скилл дозаполнит позже); проверки формата бюджета/мультипликатора пропущены")
-fi
-if [ "$BUDGET_PENDING" != true ] \
-   && ! grep -qE "~[0-9]+[.,]?[0-9]*x" "$DAYPLAN" && ! grep -qiE "мультипликатор.*(не считаю|не наст)" "$DAYPLAN"; then
+if ! grep -qE "~[0-9]+[.,]?[0-9]*x" "$DAYPLAN" && ! grep -qiE "мультипликатор.*(не считаю|не наст)" "$DAYPLAN"; then
   ERRORS+=("Мультипликатор не найден — нужен формат '~N.Nx' в строке бюджета, либо явная оговорка 'мультипликатор не считаю'")
 fi
 
@@ -240,7 +230,7 @@ fi
 
 # issue #328: русская 'ч' — стандартный формат formatting.md, латинская 'h' — старый
 # формат, оставлена для обратной совместимости с уже существующими артефактами.
-if [ "$BUDGET_PENDING" != true ] && ! grep -qE "~[0-9]+[.,]?[0-9]* ?[hч] РП" "$DAYPLAN"; then
+if ! grep -qE "~[0-9]+[.,]?[0-9]* ?[hч] РП" "$DAYPLAN"; then
   ERRORS+=("Бюджет дня не в формате '~Xч РП / ~Yч физ' (латинская 'h' тоже принимается)")
 fi
 
@@ -321,22 +311,11 @@ if [ ${#MISSING[@]} -gt 0 ] || [ ${#ERRORS[@]} -gt 0 ]; then
   MSG="⛔ DAYPLAN VALIDATION FAILED."
   [ ${#MISSING[@]} -gt 0 ] && MSG="$MSG Пропущены секции (${#MISSING[@]}): $MISSING_STR."
   [ ${#ERRORS[@]} -gt 0 ] && MSG="$MSG Ошибки формата/структуры: $ERRORS_STR."
-  if [ ${#WARNINGS[@]} -gt 0 ]; then
-    WARN_STR=$(printf '; %s' "${WARNINGS[@]}")
-    WARN_STR=${WARN_STR:2}
-    MSG="$MSG Замечания (сами по себе не блокируют): $WARN_STR."
-  fi
   MSG="$MSG Исправь DayPlan перед коммитом."
 
   jq -n --arg reason "$MSG" '{"decision": "block", "reason": $reason}'
 else
-  CONTEXT="✅ DayPlan прошёл валидацию: секции, ## заголовки, непустые блоки, мультипликатор, carry-over."
-  if [ ${#WARNINGS[@]} -gt 0 ]; then
-    WARN_STR=$(printf '; %s' "${WARNINGS[@]}")
-    WARN_STR=${WARN_STR:2}
-    CONTEXT="⚠️ DayPlan прошёл валидацию с замечаниями (коммит не блокируют): $WARN_STR"
-  fi
-  jq -n --arg ctx "$CONTEXT" '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": $ctx}}'
+  jq -n '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "✅ DayPlan прошёл валидацию: секции, ## заголовки, непустые блоки, мультипликатор, carry-over."}}'
 fi
 
 exit 0

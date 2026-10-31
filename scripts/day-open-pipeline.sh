@@ -1300,6 +1300,13 @@ TRIAGE_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.triage // "unknown"')
 MEMORY_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.memory // "unknown"')
 
 echo "  calendar=$CALENDAR_PF scout=$SCOUT_PF triage=$TRIAGE_PF memory=$MEMORY_PF"
+# issue #1279: under a frozen canon the memory backup is published in the
+# background; a failed last attempt is surfaced here (advisory, never aborts).
+if [ -f "$IWE_SCRIPTS/exocortex-publish.sh" ]; then
+  EXO_PUBLISH_RC=0
+  EXO_PUBLISH_LINE=$(bash "$IWE_SCRIPTS/exocortex-publish.sh" status 2>/dev/null) || EXO_PUBLISH_RC=$?
+  [ "$EXO_PUBLISH_RC" -eq 3 ] && echo "  ⚠ $EXO_PUBLISH_LINE"
+fi
 
 if [ "$CALENDAR_PF" = "fail" ]; then abort "Calendar preflight failed"; fi
 if [ "$SCOUT_PF" = "fail" ]; then abort "Scout preflight failed"; fi
@@ -1418,55 +1425,10 @@ if [ "$FORCE" != "true" ]; then
       YDAY_DAYPLAN="archive/day-plans/DayPlan $YDAY.md"
       DC_DONE=$(cd "$DS_STRATEGY" && git log HEAD origin/main --format="" --name-only -- "$YDAY_DAYPLAN" 2>/dev/null | head -1)
       if [ -z "$DC_DONE" ] && [ -n "$YDAY_COMMITS" ]; then
-        # День, у которого плана никогда не было (Открытие делалось вручную в живой
-        # сессии, утренний конвейер откладывался и т.п.), закрывать нечего: сигнал
-        # «архивный DayPlan за YDAY» не появится никогда, и гард откладывал бы
-        # Открытие каждым тиком до конца дня (найдено вживую 29.10.2026: DayPlan
-        # за 28.10 не существовал ни в одной локации, defer на каждом тике 04:00+).
-        # «Не существовал никогда» — по обеим локациям и обоим ref'ам, плюс рабочее
-        # дерево: незакоммиченный план в current/ сюда не входит — его случай ждёт
-        # Day Close, как и раньше.
-        PLAN_EVER=$(cd "$DS_STRATEGY" && git log HEAD origin/main --format="" --name-only \
-            -- "current/DayPlan $YDAY.md" "archive/day-plans/DayPlan $YDAY.md" 2>/dev/null | head -1)
-        if [ -z "$PLAN_EVER" ] && [ ! -f "$DS_STRATEGY/current/DayPlan $YDAY.md" ]; then
-          echo "  No DayPlan for $YDAY ever existed (HEAD/origin, both locations; nothing to archive) — proceeding."
-        else
-          # Host self-heal (2026-09-11, IWE scheduler РП; перенесено из форка
-          # governance-репо 29.10.2026): на хосте без вечернего Day Close (вечерний
-          # сценарий — только note-review) сиротский план в current/ ждал бы архивации
-          # вечно. Зеркало шага 10c закрытия дня: автоархивация того же
-          # детерминированного сигнала (архивный DayPlan в git); ошибка архивации
-          # оставляет откладывание.
-          if [ -f "$DS_STRATEGY/current/DayPlan $YDAY.md" ]; then
-            case "$(uname -s)" in
-              MINGW*|MSYS*|CYGWIN*)
-                echo "  No Day Close flow on this host — auto-archiving orphan DayPlan $YDAY (current/ -> archive/day-plans/)."
-                (
-                  cd "$DS_STRATEGY" || exit 1
-                  if git ls-files --error-unmatch "current/DayPlan $YDAY.md" >/dev/null 2>&1; then
-                    git mv "current/DayPlan $YDAY.md" "archive/day-plans/DayPlan $YDAY.md" || exit 1
-                  else
-                    mv "current/DayPlan $YDAY.md" "archive/day-plans/DayPlan $YDAY.md" || exit 1
-                    git add "archive/day-plans/DayPlan $YDAY.md" || exit 1
-                  fi
-                  git commit -q -m "day-close: auto-archive DayPlan $YDAY (host without close flow)" || exit 1
-                  git push -q 2>/dev/null || true
-                ) && DC_DONE=yes
-                if [ -n "$DC_DONE" ]; then
-                  echo "  Auto-archived orphan DayPlan $YDAY — proceeding."
-                else
-                  echo "  WARN: auto-archive of DayPlan $YDAY failed — keeping defer."
-                fi
-                ;;
-            esac
-          fi
-          if [ -z "$DC_DONE" ]; then
-            echo "  Day Close for $YDAY not done yet (no archived DayPlan) — deferring Day Open (will regenerate after close)."
-            tg_notify "⏸ Day Open $DATE отложен: закрытие $YDAY ещё не долетело до сервера (гонка расписаний, не поломка). Пересоберётся автоматически после закрытия (или запусти с --force)." terminal
-            # Ф32 п.11 (WP-484, 31.07): deferred ≠ done — exit 7, scheduler retries next tick.
-            exit 7
-          fi
-        fi
+        echo "  Day Close for $YDAY not done yet (no archived DayPlan) — deferring Day Open (will regenerate after close)."
+        tg_notify "⏸ Day Open $DATE отложен: закрытие $YDAY ещё не долетело до сервера (гонка расписаний, не поломка). Пересоберётся автоматически после закрытия (или запусти с --force)." terminal
+        # Ф32 п.11 (WP-484, 31.07): deferred ≠ done — exit 7, scheduler retries next tick.
+        exit 7
       fi
       if [ -n "$DC_DONE" ]; then
         echo "  Day Close for $YDAY found (archived DayPlan present) — proceeding."

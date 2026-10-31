@@ -179,6 +179,7 @@ PLATFORM_HOOKS_EXPLICIT_INCLUDE=(
     "seed/strategy/scripts/day-open-ledger-render-patch.py"
     "seed/strategy/scripts/day-open-multiplier-backfill-patch.py"
     "seed/strategy/scripts/day-open-priorities-patch.py"
+    "seed/strategy/scripts/day-open-sync-banner-patch.py"  # stale-input banner step 4.58 (#1245)
     "seed/strategy/scripts/day-open-version-check-patch.py"
     "seed/strategy/scripts/ledger-append.sh"
     "seed/strategy/scripts/llm-proxy-launcher.sh"
@@ -270,6 +271,9 @@ SCRIPT_CONTRACT_EXPLICIT_INCLUDE=(
     "scripts/tests/run-issue-tests.sh"
     "scripts/tests/test_issue_1032_strategy_session_offline.sh"
     "scripts/tests/test_issue_1032_windows_fail_closed.sh"
+    # The delivered #1257 test invokes this verifier regression suite.
+    "scripts/tests/check-wp-registered-smoke.sh"
+    "scripts/tests/test_issue_1257_wp_registration.sh"
     "scripts/tests/test_issue_434_pipeline_scaffold_only.sh"
     "scripts/tests/test_issue_453_calendar_private_visibility.sh"
     "scripts/tests/test_issue_455_scaffold_missing_lib_fatal.sh"
