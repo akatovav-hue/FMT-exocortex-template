@@ -1,5 +1,5 @@
 #!/bin/bash
-# verify-context-budget.sh — M1 contract: hot-framework ≤55K tokens per session (WP-445 Ф6)
+# verify-context-budget.sh — M1 contract: hot-framework ≤20K tokens per session (WP-445 Ф6; tightened from 55K — peer-session 2026-06-28-02)
 # Comments in English per engineering code style (IWE meeting 2026-06-14).
 set -euo pipefail
 
