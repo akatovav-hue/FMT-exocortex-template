@@ -8,10 +8,16 @@
 # «Календарь» для DayPlan/WeekPlan. Потребители (day-open-preflight.sh,
 # day-open-scaffold.sh, ручные вызовы) встраивают stdout как есть.
 #
-# Требует:
+# Требует (по порядку, первый найденный wins):
 #   env: B24_DEFAULT_WEBHOOK (incoming webhook с scope calendar)
-#   или файл ~/.secrets/b24-webhook: либо сырой URL в первой строке,
+#   файл ~/.secrets/b24-webhook: либо сырой URL в первой строке,
 #   либо строка B24_DEFAULT_WEBHOOK=<url>
+#   env-файл с B24_DEFAULT_WEBHOOK=<url> (только извлечение строки, файл
+#   не исполняется): путь из env B24_SECRETS_FILE, затем
+#   <корень мастерской>/.secrets/bitrix24.env (тот же файл, что читают
+#   bitrix-mirror push/pull — РП-68), затем ~/.secrets/bitrix24.env
+# Чей календарь: по умолчанию владелец webhook'а (user.current),
+# переопределение: env B24_CALENDAR_OWNER_ID (числовой id пользователя).
 #
 # Использование:
 #   bash bitrix-calendar.sh YYYY-MM-DD
@@ -47,14 +53,31 @@ if [ -z "$WEBHOOK" ] && [ -f "$SECRET_FILE" ]; then
   WEBHOOK=$(printf '%s' "$WEBHOOK" | tr -d "\"'")
 fi
 
+# источник 3: env-файл зеркала Битрикса — строка B24_DEFAULT_WEBHOOK=<url>
+# извлекается grep'ом, файл целиком не исполняется (M4 secret hygiene)
+if [ -z "$WEBHOOK" ]; then
+  for envfile in "${B24_SECRETS_FILE:-}" \
+                 "$(cd "$(dirname "$0")/../.." && pwd)/.secrets/bitrix24.env" \
+                 "$HOME/.secrets/bitrix24.env"; do
+    [ -n "$envfile" ] && [ -f "$envfile" ] || continue
+    line=$(grep -E '^[[:space:]]*(export[[:space:]]+)?B24_DEFAULT_WEBHOOK=' "$envfile" | tail -n 1)
+    WEBHOOK="${line#*=}"
+    WEBHOOK="${WEBHOOK//[[:space:]]/}"
+    WEBHOOK="${WEBHOOK//\"/}"
+    WEBHOOK=$(printf '%s' "$WEBHOOK" | tr -d "'")
+    [ -n "$WEBHOOK" ] && break
+  done
+fi
+
 render_pending() {
   local reason="$1"
   cat <<EOF
 ## Календарь
 
 > ⏳ PENDING: Календарь Битрикс24 ожидает подключения: $reason
-> Для пилота: создайте incoming webhook (Портал → Приложения → Вебхуки,
-> scope «Календарь») и положите URL в ~/.secrets/b24-webhook (первая строка).
+> Где взять webhook: env B24_DEFAULT_WEBHOOK, файл ~/.secrets/b24-webhook
+> (первая строка) или B24_DEFAULT_WEBHOOK в <корень мастерской>/.secrets/bitrix24.env
+> (файл зеркала Битрикса, scope должен включать «Календарь»).
 EOF
 }
 
@@ -81,9 +104,20 @@ else
   TITLE="Календарь ($FROM)"
 fi
 
+# --- чей календарь: по умолчанию — владелец webhook'а (user.current),
+# переопределение: env B24_CALENDAR_OWNER_ID ---
+OWNER_ID="${B24_CALENDAR_OWNER_ID:-}"
+if [ -z "$OWNER_ID" ]; then
+  ME=$(curl -fsS -m 20 "${WEBHOOK%/}/user.current" 2>/dev/null) || ME=""
+  OWNER_ID=$(printf '%s' "$ME" | grep -oE '"ID":"[0-9]+"' | head -n 1 | grep -oE '[0-9]+')
+fi
+OWNER_ARGS=()
+[ -n "$OWNER_ID" ] && OWNER_ARGS=(--data-urlencode "ownerId=$OWNER_ID")
+
 # --- запрос ---
 RESPONSE=$(curl -fsS -m 20 -G "${WEBHOOK%/}/calendar.event.get" \
   --data-urlencode "type=user" \
+  "${OWNER_ARGS[@]}" \
   --data-urlencode "from=$FROM" \
   --data-urlencode "to=$TO" 2>/dev/null)
 if [ -z "$RESPONSE" ]; then
@@ -97,7 +131,7 @@ if [ -z "$PY3" ]; then
 fi
 [ -n "$PY3" ] || { render_pending "python3 не найден"; exit 0; }
 
-TITLE="$TITLE" FROM="$FROM" TO="$TO" RESPONSE="$RESPONSE" MODE="$MODE" "$PY3" - <<'PYEOF'
+PYTHONUTF8=1 PYTHONIOENCODING=utf-8 TITLE="$TITLE" FROM="$FROM" TO="$TO" RESPONSE="$RESPONSE" MODE="$MODE" "$PY3" - <<'PYEOF'
 import json, os, re, sys
 
 title = os.environ["TITLE"]; mode = os.environ["MODE"]
@@ -120,27 +154,44 @@ for e in events:
     df = (e.get("DATE_FROM") or e.get("date_from") or "")[:16]
     dt = (e.get("DATE_TO") or e.get("date_to") or "")[:16]
     loc = strip(e.get("LOCATION") or e.get("location") or "")
+    if loc.startswith("calendar_"): loc = ""  # служебный id переговорки, не место
     day = df[:10]
-    time_s = df[11:16] if len(df) >= 16 else ""
-    time_e = dt[11:16] if len(dt) >= 16 else ""
-    when = f"{time_s}–{time_e}".strip("–") if time_s else "весь день"
-    rows.append((day, when, name, loc))
+    time_s = ""
+    if e.get("DT_SKIP_TIME") == "Y":
+        when = "весь день"
+    else:
+        time_s = df[11:16] if len(df) >= 16 else ""
+        time_e = dt[11:16] if len(dt) >= 16 else ""
+        when = f"{time_s}–{time_e}".strip("–") if time_s else "весь день"
+    # ключ сортировки: события на весь день — в начале дня
+    rows.append((day, time_s or "00:00", when, name, loc))
 
 rows.sort()
+# day-режим: Битрикс вместе с реальными вхождениями возвращает повторяющиеся
+# события с датой начала исходной серии (за пределами запрошенного дня) —
+# показываем только вхождения запрошенного дня (события, переходящие на
+# полночь, при этом отсекаются — сознательное упрощение для day-plan).
+# DATE_FROM у Битрикса «DD.MM.YYYY», запрос — ISO «YYYY-MM-DD»: сравниваем
+# после конвертации.
+if mode != "week":
+    def to_iso(dmy):
+        p = dmy.split(".")
+        return f"{p[2]}-{p[1]}-{p[0]}" if len(p) == 3 and len(dmy) == 10 else dmy
+    rows = [r for r in rows if to_iso(r[0]) == os.environ["FROM"]]
 # «✅» — маркер успешного ответа для day-open-preflight.sh (контракт server-calendar.sh)
 print(f"## {title} ✅\n")
 if not rows:
     print("> Нет событий.\n"); sys.exit(0)
 if mode == "week":
     cur = None
-    for day, when, name, loc in rows:
+    for day, _, when, name, loc in rows:
         if day != cur:
             cur = day; print(f"**{day}**")
         loc_s = f" — {loc}" if loc else ""
         print(f"- {when} {name}{loc_s}")
         print()
 else:
-    for _, when, name, loc in rows:
+    for _, _, when, name, loc in rows:
         loc_s = f" — {loc}" if loc else ""
         print(f"- {when} {name}{loc_s}")
     print()

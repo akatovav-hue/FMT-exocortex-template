@@ -2200,6 +2200,10 @@
       "sha256": "74bdfc06f5f3ec0947d8984eece0d2e80addca9722b47a79cbbabec8569fdf9f"
     },
     {
+      "path": "scripts/bitrix-calendar.sh",
+      "sha256": "6bfabdabf052dc4690ff8414e6b706239c6a6c61993ab28836491ea5dd9a369d"
+    },
+    {
       "path": "scripts/canon-dirty-proposals.sh",
       "sha256": "4f33b3658380441d0e2dd93697f538206c7ded1ad8fc3d80a08614ed64de4901"
     },
