@@ -37,11 +37,11 @@ check_gate_order() {
 }
 
 check_gate_order "$ROOT/roles/extractor/scripts/extractor.sh" \
-  'AI_CLI="${AI_CLI:-$CLAUDE_PATH}"' \
+  'AI_CLI="${AI_CLI:-}"' \
   'ERROR: $AI_CLI CLI не найден'
 
 check_gate_order "$ROOT/roles/strategist/scripts/strategist.sh" \
-  'AI_CLI="${AI_CLI:-$CLAUDE_PATH}"' \
+  'AI_CLI="${AI_CLI:-}"' \
   'ERROR: $AI_CLI CLI не найден'
 
 check_gate_order "$ROOT/scripts/setup-extractor-feeders.sh" \

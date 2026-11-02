@@ -830,23 +830,13 @@ class KimiCliExecutor(Executor):
     supports_heartbeat = False
 
     def build_cmd(self, prompt: str, model: str) -> list[str]:
-        # `--print` runs Kimi non-interactively AND auto-approves tool actions
-        # (per `kimi --help`). Without it, `kimi -p` opens an interactive agent
-        # that never returns to stdout — the dispatcher poll loop would block
-        # until CLAUDE_TIMEOUT_SEC. `--final-message-only` prints just the final
-        # assistant message (without it, `--output-format text` dumps the whole
-        # event stream). `--output-format` is only honoured with `--print`. The
-        # Claude model string is not portable to Kimi, so the Kimi config
-        # default model is used instead of passing `--model`.
-        # The Kimi binary may be VS Code-managed and reachable only via a shell
-        # alias (invisible to subprocess). Resolve an explicit path: IWE_KIMI_BIN
-        # override → PATH lookup → bare "kimi" (the bare value soft-fails with
-        # "kimi CLI not found in PATH" in invoke_claude_with_heartbeat).
+        # kimi-code 0.36: `--print`/`--final-message-only` removed — `kimi -p`
+        # сам по себе non-interactive и печатает финальный ответ (см. kimi --help).
+        # Флаги оставлены минимальными намеренно: неизвестный флаг убивает весь
+        # вызов (WP-318, 2026-11-02). Модель claude непереносима → дефолт из
+        # config.toml kimi, как и раньше.
         kimi_bin = os.environ.get("IWE_KIMI_BIN") or shutil.which("kimi") or "kimi"
-        return [
-            kimi_bin, "--print", "--final-message-only",
-            "--output-format", "text", "-p", prompt,
-        ]
+        return [kimi_bin, "-p", prompt]
 
 
 # Registry of agentic runtimes reachable through the bot SESSION path.

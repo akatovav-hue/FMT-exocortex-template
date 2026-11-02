@@ -58,9 +58,35 @@ fi
 ENV_FILE="$HOME/.config/aist/env"
 
 # AI CLI: переопределение через переменные окружения (см. strategist.sh)
-AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
+# WP-318 (2026-11-02): Claude может отсутствовать в стеке — если AI_CLI не задан
+# явно и claude не резолвится, fallback на Kimi; claude-флаги ему непереносимы,
+# поэтому дефолт для не-claude CLI — автономный режим (--auto).
+AI_CLI="${AI_CLI:-}"
+if [ -z "$AI_CLI" ]; then
+    if command -v "$CLAUDE_PATH" >/dev/null 2>&1 || [ -x "$CLAUDE_PATH" ]; then
+        AI_CLI="$CLAUDE_PATH"
+    elif command -v kimi >/dev/null 2>&1; then
+        AI_CLI="$(command -v kimi)"
+    else
+        AI_CLI="$CLAUDE_PATH"  # прежняя диагностика exit 127 сработает ниже
+    fi
+fi
+AI_CLI_IS_CLAUDE=0
+if [ "$AI_CLI" = "$CLAUDE_PATH" ]; then
+    AI_CLI_IS_CLAUDE=1
+else
+    _ai_cli_resolved="$(command -v "$AI_CLI" 2>/dev/null)" || _ai_cli_resolved=""
+    if [ -n "$_ai_cli_resolved" ] && { [ "$_ai_cli_resolved" = "$CLAUDE_PATH" ] || [ "$_ai_cli_resolved" -ef "$CLAUDE_PATH" ]; }; then
+        AI_CLI_IS_CLAUDE=1
+    fi
+fi
+unset _ai_cli_resolved
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
-AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+if [ "$AI_CLI_IS_CLAUDE" = 1 ]; then
+    AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+else
+    AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---auto}"
+fi
 
 # AR.293: гейт проверяет эффективную программу ($AI_CLI), не литерал CLAUDE_PATH —
 # иначе override остаётся декоративным, когда claude физически отсутствует, но
@@ -211,6 +237,11 @@ load_env() {
 # the file as shell and export every other variable it happens to hold.
 load_claude_subscription_token() {
     if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        return 0
+    fi
+    # WP-318: при AI_CLI != claude claude-токен не нужен — молчаливый пропуск
+    # вместо ложного WARN «прогоны будут падать» на каждом запуске.
+    if ! ai_cli_is_claude; then
         return 0
     fi
     local raw_file="$HOME/.secrets/claude_code_oauth_token"

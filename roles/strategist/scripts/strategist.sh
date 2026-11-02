@@ -151,7 +151,33 @@ fi
 CLAUDE_TIMEOUT=1800  # 30 мин — защита от зависания Claude CLI
 
 # AI CLI: переопределение через переменные окружения (см. extractor.sh)
-AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
+# WP-318 (2026-11-02): Claude может отсутствовать в стеке — если AI_CLI не задан
+# явно и claude не резолвится, fallback на Kimi; claude-флаги ему непереносимы,
+# поэтому дефолт для не-claude CLI — автономный режим (--auto), а --model/
+# --allowedTools в run_claude ниже подавляются по AI_CLI_IS_CLAUDE.
+AI_CLI="${AI_CLI:-}"
+if [ -z "$AI_CLI" ]; then
+    if command -v "$CLAUDE_PATH" >/dev/null 2>&1 || [ -x "$CLAUDE_PATH" ]; then
+        AI_CLI="$CLAUDE_PATH"
+    elif command -v kimi >/dev/null 2>&1; then
+        AI_CLI="$(command -v kimi)"
+    else
+        AI_CLI="$CLAUDE_PATH"  # прежняя диагностика exit 127 сработает ниже
+    fi
+fi
+AI_CLI_IS_CLAUDE=0
+if [ "$AI_CLI" = "$CLAUDE_PATH" ]; then
+    AI_CLI_IS_CLAUDE=1
+else
+    _ai_cli_resolved="$(command -v "$AI_CLI" 2>/dev/null)" || _ai_cli_resolved=""
+    if [ -n "$_ai_cli_resolved" ] && { [ "$_ai_cli_resolved" = "$CLAUDE_PATH" ] || [ "$_ai_cli_resolved" -ef "$CLAUDE_PATH" ]; }; then
+        AI_CLI_IS_CLAUDE=1
+    fi
+fi
+unset _ai_cli_resolved
+if [ "$AI_CLI_IS_CLAUDE" != 1 ]; then
+    AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---auto}"
+fi
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
 
 # AR.293: гейт проверяет эффективную программу ($AI_CLI), не литерал CLAUDE_PATH —
@@ -898,9 +924,12 @@ ${prompt}"
     # Запуск Claude Code с содержимым команды как промпт (с timeout-защитой)
     local rc=0
     local model_args=()
-    if [ -n "$model_override" ]; then
+    if [ -n "$model_override" ] && [ "${AI_CLI_IS_CLAUDE:-1}" = 1 ]; then
         model_args=(--model "$model_override")
         log "Model override: $model_override"
+    elif [ -n "$model_override" ]; then
+        # WP-318: claude-имена моделей убивают вызов не-claude CLI целиком.
+        log "Model override '$model_override' пропущен: AI_CLI не claude-compatible"
     fi
     # NB: --dangerously-skip-permissions не используется — Claude Code блокирует флаг
     # под root/sudo (Linux cron). --allowedTools задаёт явный whitelist, чего достаточно.
@@ -919,6 +948,10 @@ ${prompt}"
         # намеренный word-splitting единой override-строки — тот же контракт,
         # что уже принят в extractor.sh
         read -ra extra_flags <<< "$AI_CLI_EXTRA_FLAGS" || { log "ERROR: не удалось разобрать AI_CLI_EXTRA_FLAGS"; return 1; }
+    elif [ "${AI_CLI_IS_CLAUDE:-1}" != 1 ]; then
+        # WP-318: --model/--allowedTools — флаги claude; для другого CLI только
+        # автономный режим (календарный MCP-коннектор claude под ним недоступен).
+        extra_flags=(--auto)
     else
         extra_flags=("${model_args[@]}" --allowedTools "Read,Write,Edit,Glob,Grep,Bash${calendar_mcp:+,$calendar_mcp}")
     fi
