@@ -34,7 +34,13 @@
 # These four names are the operational protocols that open this binding
 # themselves, from their own SKILL.md, not something a session can claim for
 # an arbitrary unrelated commit.
-ALLOWED_HOUSEKEEPING_REASONS='^(day-open|day-close|week-close|month-close|update-delivery)$'
+ALLOWED_HOUSEKEEPING_REASONS='^(day-open|day-close|week-close|week-review|month-close|update-delivery)(-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+)?$'
+# week-review добавлен 02.11.2026: сценарий strategist.sh открывает housekeeping-сессию
+# (Ф25, semaphore strategist-week-review-housekeeping-week-review-<date>-<pid>.open), а гейт
+# в agent-keyed режиме видел только kimi-*.open → week-review работу сделал, но коммит
+# был заблокирован (rc=70, инцидент ночи 02.11). Суффикс -<date>-<pid> — уникальность
+# имени семафора за run (strategist.sh reason="$scenario-$DATE-$$"); список остаётся
+# закрытым, суффикс допустим только для имён из него.
 #
 # What this gate does NOT do: it does not require the semaphore to live in the
 # repo being committed to — the semaphore directory is session-scoped, not
@@ -97,7 +103,11 @@ SESSION_DIR="$IWE_ROOT/.iwe-runtime/sessions"
 # ПП-74б/31.08 already hit this exact defect: a shorter session_id that is a
 # prefix of a longer one would otherwise match it as a substring).
 if [ "$AGENT_KEYED" = 1 ]; then
-  SEM_MATCHES=$(ls "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
+  # WP-561 Ф51 (agent-keyed): семафоры того же агента + служебные сессии ролей
+  # (strategist-* housekeeping, открываются wrapper'ом сценария — Ф25). Без них
+  # сценарий week-review в agent-keyed режиме невидим гейту и падает на коммите
+  # (rc=70, инцидент 02.11.2026): работа сделана, семафор жив, гейт его не видит.
+  SEM_MATCHES=$(ls "$SESSION_DIR/${AGENT}"-*.open "$SESSION_DIR/strategist-"*.open 2>/dev/null)
 else
   SEM_MATCHES=$(grep -lxF "harness_session_id: $SESSION_ID" "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
 fi
