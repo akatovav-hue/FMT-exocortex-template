@@ -38,10 +38,15 @@ CONFIG="${2:-$IWE/$GOV_REPO/exocortex/day-rhythm-config.yaml}"
 # report "disabled" (like Scout) and do not call the script at all.
 CALENDAR_STATUS="unknown"
 CALENDAR_SOURCE=$(iwe_calendar_source "$IWE/params.yaml")
+# WP-318: источник выбирает скрипт — script = Google (server-calendar.sh),
+# bitrix = Битрикс24 (bitrix-calendar.sh); connector сохраняет прежний
+# server-mode вызов.
+CALENDAR_SCRIPT="server-calendar.sh"
+[ "$CALENDAR_SOURCE" = "bitrix" ] && CALENDAR_SCRIPT="bitrix-calendar.sh"
 if [ "$CALENDAR_SOURCE" = "none" ]; then
   CALENDAR_STATUS="disabled"
 else
-  CALENDAR_OUT=$(bash "$SCRIPT_DIR/server-calendar.sh" "$DATE" "$CONFIG" 2>/dev/null || echo "")
+  CALENDAR_OUT=$(bash "$SCRIPT_DIR/$CALENDAR_SCRIPT" "$DATE" "$CONFIG" 2>/dev/null || echo "")
   if [ -z "$CALENDAR_OUT" ]; then
     CALENDAR_STATUS="fail"
   elif echo "$CALENDAR_OUT" | grep -q "PENDING"; then

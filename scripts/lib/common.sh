@@ -421,7 +421,9 @@ iwe_safe_pull() {
 
 # iwe_calendar_source [PARAMS_FILE] — where Day Open takes the calendar from
 # (issue #942): connector (default: calendar connector, then server-calendar.sh),
-# script (server-calendar.sh only), none (the calendar is not used at all).
+# script (server-calendar.sh only = Google Calendar), bitrix (scripts/bitrix-
+# calendar.sh = Bitrix24 через incoming webhook, WP-318 — контур без Claude),
+# none (the calendar is not used at all).
 # A missing key or file means connector, so existing installs keep working; an
 # unknown value warns on stderr and also means connector.
 iwe_calendar_source() {
@@ -431,9 +433,9 @@ iwe_calendar_source() {
     | sed -E 's/^calendar_source:[[:space:]]*//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^["'"'"']//; s/["'"'"']$//')
   case "$value" in
     ''|connector) echo connector ;;
-    script|none) echo "$value" ;;
+    script|none|bitrix) echo "$value" ;;
     *)
-      echo "WARN: params.yaml: calendar_source «$value» неизвестно (connector|script|none), использую connector" >&2
+      echo "WARN: params.yaml: calendar_source «$value» неизвестно (connector|script|bitrix|none), использую connector" >&2
       echo connector ;;
   esac
 }

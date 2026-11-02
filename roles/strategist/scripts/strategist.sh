@@ -883,6 +883,7 @@ run_claude() {
     case "$calendar_source" in
         none) calendar_note=" Календарь отключён (params.yaml: calendar_source: none): шаг про календарь (3a) пропусти, секцию «Календарь» в плане не пиши, календарный коннектор не запрашивай." ;;
         script) calendar_note=" Календарь берётся только из scripts/server-calendar.sh (params.yaml: calendar_source: script): календарный коннектор не запрашивай." ;;
+        bitrix) calendar_note=" Календарь берётся только из scripts/bitrix-calendar.sh (params.yaml: calendar_source: bitrix, WP-318): календарный коннектор не запрашивай — данные о встречах появятся в контексте запуска или секция будет заглушкой «ожидает подключения»." ;;
     esac
 
     # #961: note-review started from this script has no chat with the pilot. One line says so, the way the
