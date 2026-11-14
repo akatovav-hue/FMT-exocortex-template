@@ -1004,8 +1004,19 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 # Write to Neon
+# author-only writer (NEON_URL/DT_USER_ID — secrets of the template author) is
+# read-only from FMT and is NOT substituted into .iwe-runtime: без fallback
+# каждый прогон падал «can't open file .../dt-collect-neon.py» (14.11.2026).
+NEON_WRITER="$SCRIPT_DIR/dt-collect-neon.py"
+if [ ! -f "$NEON_WRITER" ]; then
+    for _neon_candidate in \
+        "${IWE_TEMPLATE:-}/roles/synchronizer/scripts/dt-collect-neon.py" \
+        "$HOME/IWE/FMT-exocortex-template/roles/synchronizer/scripts/dt-collect-neon.py"; do
+        [ -f "$_neon_candidate" ] && NEON_WRITER="$_neon_candidate" && break
+    done
+fi
 log "Writing to Neon (user_id=$DT_USER_ID)..."
-python3 "$SCRIPT_DIR/dt-collect-neon.py" "$DT_USER_ID" "$MERGED" 2>>"$LOG_FILE"
+python3 "$NEON_WRITER" "$DT_USER_ID" "$MERGED" 2>>"$LOG_FILE"
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then
