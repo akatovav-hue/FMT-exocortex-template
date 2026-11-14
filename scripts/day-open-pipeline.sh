@@ -1566,6 +1566,22 @@ done
 # ============================================
 # 2. Ensure LLM Proxy available
 # ============================================
+# PID-обнаружение держателя PROXY_PORT. lsof (macOS/Linux), ss (Linux),
+# netstat -ano (Windows/Git Bash — ни lsof, ни ss там нет: без этого fallback
+# самолечение «restart local proxy» никого не убивало и stale-адаптер жил
+# вечно, 14.11.2026).
+port_listener_pids() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -ti :"$PROXY_PORT" 2>/dev/null || true
+  elif command -v ss >/dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | grep ":$PROXY_PORT " | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u
+  else
+    netstat -ano 2>/dev/null | awk -v p=":$PROXY_PORT" '$1 == "TCP" && $4 == "LISTENING" && $2 ~ p"$" {print $NF}' | sort -u
+  fi
+}
+kill_port_listener() {  # <pid>; Git Bash kill по нативному Windows-PID не всегда работает — добиваем taskkill
+  kill "$1" 2>/dev/null || taskkill //F //PID "$1" >/dev/null 2>&1 || true
+}
 # issue #434: skipped entirely under --scaffold-only — only step 4 (LLM Fill)
 # below actually needs the proxy; the deterministic scaffold (step 3) does not.
 if [ "$SCAFFOLD_ONLY" != "true" ]; then
@@ -1587,7 +1603,7 @@ if [ "$PROXY_HEALTH" != "ok" ]; then
     # testing into month-open-night-run.sh:78) would silently break the Mac side
     # of the exact dual-machine pair this pipeline is designed to run on. Only
     # checking port occupancy either way, PID unused below.
-    if lsof -ti :"$PROXY_PORT" >/dev/null 2>&1 || ss -tln 2>/dev/null | grep -q ":$PROXY_PORT "; then
+    if [ -n "$(port_listener_pids)" ]; then
       # Port already held by another process — likely a live proxy the check above
       # missed on a transient blip. Spawning here would just crash into "Address
       # already in use" and spam the error log without helping (found 2026-07-11).
@@ -1643,8 +1659,7 @@ if [ "$AUTH_CODE" != "200" ]; then
     # diagnoses (2026-07-03, 2026-08-02) already landed on; retry the probe once
     # before falling back to abort.
     echo "  Authorized probe failed (HTTP $AUTH_CODE) — restarting local proxy and retrying once"
-    STALE_PIDS=$(lsof -ti :"$PROXY_PORT" 2>/dev/null || true)
-    for _pid in $STALE_PIDS; do kill "$_pid" 2>/dev/null || true; done
+    for _pid in $(port_listener_pids); do kill_port_listener "$_pid"; done
     for _i in 1 2 3 4 5 6 7 8 9 10; do
       sleep 2
       curl -s "${LLM_PROXY_URL}/v1/health" 2>/dev/null | grep -q "ok" && break
